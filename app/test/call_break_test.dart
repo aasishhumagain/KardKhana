@@ -1,10 +1,79 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kardkhana/call_break/call_break_game.dart';
 import 'package:kardkhana/call_break/call_break_room.dart';
+import 'package:kardkhana/call_break/call_break_session.dart';
+import 'package:kardkhana/call_break/offline_call_break.dart';
 
 void main() {
+  test(
+    'one player and three CPUs finish five rounds offline and rematch',
+    () async {
+      final table = OfflineCallBreak(
+        random: Random(19),
+        cpuDelay: Duration.zero,
+      );
+      addTearDown(table.dispose);
+      expect(_players(table).map((player) => player['name']), [
+        'Player',
+        'CPU 1',
+        'CPU 2',
+        'CPU 3',
+      ]);
+      final totals = List.filled(CallBreakGame.playerCount, 0);
+
+      for (var round = 1; round <= CallBreakGame.roundsPerMatch; round++) {
+        expect(table.view['round'], round);
+        await _waitFor(table, () => table.view['turn'] == 0);
+        table.send('bid', {'bid': 0});
+        expect(_players(table).first['bid'], isNull);
+        table.send('bid', {'bid': 3});
+        await _waitFor(table, () => table.view['phase'] == 'playing');
+        for (final player in _players(table)) {
+          expect(
+            player['bid'],
+            inInclusiveRange(1, CallBreakGame.cardsPerHand),
+          );
+        }
+
+        for (var card = CallBreakGame.cardsPerHand; card > 0; card--) {
+          await _waitFor(table, () => table.view['turn'] == 0);
+          expect(table.view['hand'], hasLength(card));
+          final legal = (table.view['legal'] as List).cast<int>();
+          expect(legal, isNotEmpty);
+          table.send('play', {'card': -1});
+          expect(table.view['hand'], hasLength(card));
+          table.send('play', {'card': legal.first});
+        }
+
+        final last = round == CallBreakGame.roundsPerMatch;
+        await _waitFor(
+          table,
+          () => table.view['phase'] == (last ? 'matchEnd' : 'roundEnd'),
+        );
+        final players = _players(table);
+        expect(players.fold(0, (sum, p) => sum + (p['tricks'] as int)), 13);
+        for (var seat = 0; seat < players.length; seat++) {
+          final player = players[seat];
+          final earned = CallBreakGame.scoreFor(
+            player['bid'] as int,
+            player['tricks'] as int,
+          );
+          totals[seat] += earned;
+          expect(player['roundScore'], earned);
+          expect(player['score'], totals[seat]);
+        }
+        if (!last) table.send('next');
+      }
+      table.send('rematch');
+      expect(table.view['round'], 1);
+      expect(table.view['hand'], hasLength(13));
+      expect(_players(table).map((player) => player['score']), everyElement(0));
+    },
+  );
+
   test('players follow suit, trump, and beat a trick when possible', () {
     const clubLead = [PlayedCard(0, 3)];
     const trumped = [PlayedCard(0, 3), PlayedCard(1, 44)];
@@ -132,10 +201,10 @@ void main() {
   );
 }
 
-List<Map<String, dynamic>> _players(CallBreakRoom room) =>
+List<Map<String, dynamic>> _players(CallBreakSession room) =>
     (room.view['players'] as List).cast<Map<String, dynamic>>();
 
-Future<void> _waitFor(CallBreakRoom room, bool Function() condition) {
+Future<void> _waitFor(CallBreakSession room, bool Function() condition) {
   if (condition()) return Future.value();
   final done = Completer<void>();
   void listen() {

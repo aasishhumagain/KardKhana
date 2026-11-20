@@ -1,7 +1,6 @@
-import 'dart:ui' show Size;
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kardkhana/main.dart' as app;
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   testWidgets('landscape catalog opens each game with its player limit', (
@@ -44,8 +43,23 @@ void main() {
       expect(find.text('Choose a game'), findsNothing);
       expect(find.text(game.key), findsOneWidget);
       expect(find.text(game.value.summary), findsOneWidget);
-      expect(find.text(game.value.limit), findsOneWidget);
 
+      if (game.key == 'Call Break') {
+        final offline = find.widgetWithText(FilledButton, 'Play offline');
+        expect(offline.hitTestable(), findsOneWidget);
+        await tester.tap(offline);
+        await tester.pumpAndSettle();
+        expect(find.text('Call Break · Offline'), findsOneWidget);
+        for (var cpu = 1; cpu <= 3; cpu++) {
+          expect(find.text('CPU $cpu'), findsOneWidget);
+        }
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+      }
+
+      final playerLimit = find.text(game.value.limit);
+      await tester.scrollUntilVisible(playerLimit, 80);
+      expect(playerLimit, findsOneWidget);
       await tester.pageBack();
       await tester.pumpAndSettle();
     }

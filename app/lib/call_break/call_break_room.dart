@@ -3,9 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart';
-
 import 'call_break_game.dart';
+import 'call_break_session.dart';
 
 const callBreakPort = 45678;
 const _endpoint = '/call-break';
@@ -20,7 +19,7 @@ class CallBreakRoomException implements Exception {
   String toString() => message;
 }
 
-class CallBreakRoom extends ChangeNotifier {
+class CallBreakRoom extends CallBreakSession {
   CallBreakRoom._(this._socket, this._host) {
     _subscription = _socket.listen(
       _receive,
@@ -36,6 +35,7 @@ class CallBreakRoom extends ChangeNotifier {
   bool _connected = true;
   bool _disposed = false;
 
+  @override
   Map<String, dynamic> view = {};
   String? notice;
   bool get connected => _connected;
@@ -113,6 +113,7 @@ class CallBreakRoom extends ChangeNotifier {
     }
   }
 
+  @override
   void send(String action, [Map<String, Object?> fields = const {}]) {
     if (!_connected || _disposed) return;
     _socket.add(
@@ -330,40 +331,18 @@ class _RoomHost {
 
   void _broadcast() {
     final game = _game;
-    final players = [
-      for (var seat = 0; seat < _seats.length; seat++)
-        {
-          'name': _seats[seat]?.name,
-          'ready': _seats[seat]?.ready ?? false,
-          'bid': game?.bids[seat],
-          'tricks': game?.tricksWon[seat] ?? 0,
-          'score': game?.scores[seat] ?? 0,
-          'roundScore': game?.roundScores[seat] ?? 0,
-        },
-    ];
     final public = {
       'type': 'view',
       'revision': ++_revision,
-      'players': players,
-      'phase': _ended != null ? 'ended' : game?.phase.name ?? 'lobby',
-      'ended': _ended,
-      'round': game?.round,
-      'turn': game?.turn,
-      'trick': _encodeTrick(game?.trick),
-      'lastTrick': _encodeTrick(game?.lastTrick),
-      'lastWinner': game?.lastWinner,
+      ...callBreakTableView(game, [
+        for (final seat in _seats)
+          (name: seat?.name, ready: seat?.ready ?? false),
+      ], ended: _ended),
     };
     for (var seat = 0; seat < _seats.length; seat++) {
       final socket = _seats[seat]?.socket;
       if (socket == null || socket.readyState != WebSocket.open) continue;
-      socket.add(
-        jsonEncode({
-          ...public,
-          'seat': seat,
-          'hand': game?.handFor(seat) ?? const <int>[],
-          'legal': game?.legalCardsFor(seat) ?? const <int>[],
-        }),
-      );
+      socket.add(jsonEncode({...public, ...callBreakSeatView(game, seat)}));
     }
   }
 
@@ -386,10 +365,6 @@ Map<String, dynamic>? _readMessage(dynamic data) {
     return null;
   }
 }
-
-List<List<int>> _encodeTrick(List<PlayedCard>? trick) => [
-  for (final play in trick ?? const <PlayedCard>[]) [play.seat, play.card],
-];
 
 bool _validView(Map<String, dynamic> view) {
   final phase = view['phase'];

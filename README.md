@@ -24,6 +24,10 @@ the catalog navigation.
 
 ## Current milestone
 
+Choose **Call Break → Play offline** to play on one phone with three CPU
+opponents. No network connection or room code is needed. The CPU players
+estimate their bids from their hands and choose from the engine's legal moves.
+
 Call Break is playable in landscape with four people on the same Wi-Fi network
 or phone hotspot. One player opens **Call Break → Host room**, enters a nickname,
 and shares the host IP and six-digit room code. The other three use **Join room**

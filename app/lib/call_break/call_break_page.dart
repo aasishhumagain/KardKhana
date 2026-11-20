@@ -4,6 +4,15 @@ import 'package:material_ui/material_ui.dart';
 
 import 'call_break_game.dart';
 import 'call_break_room.dart';
+import 'call_break_session.dart';
+import 'offline_call_break.dart';
+
+void openOfflineCallBreak(BuildContext context) {
+  final session = OfflineCallBreak();
+  Navigator.of(context).push<void>(
+    MaterialPageRoute<void>(builder: (_) => _CallBreakTable(session: session)),
+  );
+}
 
 class CallBreakSetupPage extends StatefulWidget {
   const CallBreakSetupPage({required this.host, super.key});
@@ -56,7 +65,7 @@ class _CallBreakSetupPageState extends State<CallBreakSetupPage> {
       Navigator.of(context).pushReplacement<void, void>(
         MaterialPageRoute<void>(
           builder: (_) =>
-              _CallBreakTable(room: enteredRoom, addresses: addresses),
+              _CallBreakTable(session: enteredRoom, addresses: addresses),
         ),
       );
     } catch (error) {
@@ -159,9 +168,9 @@ Future<List<String>> _localAddresses() async {
 }
 
 class _CallBreakTable extends StatefulWidget {
-  const _CallBreakTable({required this.room, required this.addresses});
+  const _CallBreakTable({required this.session, this.addresses = const []});
 
-  final CallBreakRoom room;
+  final CallBreakSession session;
   final List<String> addresses;
 
   @override
@@ -171,20 +180,23 @@ class _CallBreakTable extends StatefulWidget {
 class _CallBreakTableState extends State<_CallBreakTable> {
   @override
   void dispose() {
-    widget.room.dispose();
+    widget.session.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final room = widget.room;
+    final session = widget.session;
+    final room = session is CallBreakRoom ? session : null;
     return Scaffold(
-      appBar: AppBar(title: const Text('Call Break')),
+      appBar: AppBar(
+        title: Text(room == null ? 'Call Break · Offline' : 'Call Break'),
+      ),
       body: SafeArea(
         child: ListenableBuilder(
-          listenable: room,
+          listenable: session,
           builder: (context, _) {
-            final view = room.view;
+            final view = session.view;
             final phase = view['phase'] as String;
             final players = (view['players'] as List)
                 .cast<Map<String, dynamic>>();
@@ -193,18 +205,25 @@ class _CallBreakTableState extends State<_CallBreakTable> {
             return ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                if (room.notice case final notice?)
+                if (room?.notice case final notice?)
                   _Message(text: notice, isError: true),
-                if (!room.connected || phase == 'ended')
+                if (room != null && (!room.connected || phase == 'ended'))
                   _Message(
                     text:
                         view['ended'] as String? ??
                         'Return to the catalog to join a new room.',
                   )
-                else if (phase == 'lobby')
+                else if (room != null && phase == 'lobby')
                   ..._buildLobby(room, players, seat)
                 else
-                  ..._buildMatch(room, players, seat, phase),
+                  ..._buildMatch(
+                    session,
+                    view,
+                    players,
+                    seat,
+                    phase,
+                    canAdvance: room?.isHost ?? true,
+                  ),
               ],
             );
           },
@@ -254,12 +273,13 @@ class _CallBreakTableState extends State<_CallBreakTable> {
   }
 
   List<Widget> _buildMatch(
-    CallBreakRoom room,
+    CallBreakSession session,
+    Map<String, dynamic> view,
     List<Map<String, dynamic>> players,
     int seat,
-    String phase,
-  ) {
-    final view = room.view;
+    String phase, {
+    required bool canAdvance,
+  }) {
     final round = view['round'] as int;
     final turn = view['turn'] as int;
     final bidding = phase == 'bidding';
@@ -320,7 +340,7 @@ class _CallBreakTableState extends State<_CallBreakTable> {
                 _PlayingCard(
                   card: card,
                   onPlay: legal.contains(card)
-                      ? () => room.send('play', {'card': card})
+                      ? () => session.send('play', {'card': card})
                       : null,
                 ),
             ],
@@ -337,16 +357,16 @@ class _CallBreakTableState extends State<_CallBreakTable> {
                   minimumSize: const Size(42, 44),
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                 ),
-                onPressed: () => room.send('bid', {'bid': bid}),
+                onPressed: () => session.send('bid', {'bid': bid}),
                 child: Text('$bid'),
               ),
           ],
         ),
-      if (room.isHost && (roundEnd || matchEnd))
+      if (canAdvance && (roundEnd || matchEnd))
         Align(
           alignment: Alignment.centerLeft,
           child: FilledButton(
-            onPressed: () => room.send(roundEnd ? 'next' : 'rematch'),
+            onPressed: () => session.send(roundEnd ? 'next' : 'rematch'),
             child: Text(roundEnd ? 'Deal next round' : 'Rematch'),
           ),
         ),

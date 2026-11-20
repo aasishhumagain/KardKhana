@@ -13,9 +13,10 @@ enum CardSuit {
 }
 
 CardSuit cardSuit(int card) => CardSuit.values[card ~/ 13];
+int cardRank(int card) => card % 13 + 2;
 
 String cardLabel(int card) {
-  final rank = card % 13 + 2;
+  final rank = cardRank(card);
   final face = switch (rank) {
     11 => 'J',
     12 => 'Q',
@@ -174,7 +175,7 @@ class CallBreakGame {
     final suit = cardSuit(card);
     final winningSuit = cardSuit(currentWinner);
     return suit == winningSuit
-        ? card % 13 > currentWinner % 13
+        ? cardRank(card) > cardRank(currentWinner)
         : suit == CardSuit.spades;
   }
 }

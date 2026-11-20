@@ -202,26 +202,16 @@ class _GameDetails extends StatelessWidget {
               children: [
                 Text(game.summary, style: theme.textTheme.headlineMedium),
                 const SizedBox(height: 12),
-                Text(game.description, style: theme.textTheme.bodyLarge),
-                const SizedBox(height: 24),
-                Card.outlined(
-                  child: ListTile(
-                    leading: const Icon(Icons.people_outline),
-                    title: Text(game.playerLimitLabel),
-                    subtitle: Text(
-                      game == _Game.callBreak
-                          ? 'Play on the same Wi-Fi network or phone hotspot.'
-                          : 'Private rooms are in development.',
-                    ),
-                  ),
-                ),
                 if (game == _Game.callBreak) ...[
-                  const SizedBox(height: 16),
                   Wrap(
                     spacing: 12,
                     runSpacing: 8,
                     children: [
                       FilledButton(
+                        onPressed: () => openOfflineCallBreak(context),
+                        child: const Text('Play offline'),
+                      ),
+                      OutlinedButton(
                         onPressed: () => _openSetup(context, host: true),
                         child: const Text('Host room'),
                       ),
@@ -231,7 +221,21 @@ class _GameDetails extends StatelessWidget {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 16),
                 ],
+                Text(game.description, style: theme.textTheme.bodyLarge),
+                const SizedBox(height: 24),
+                Card.outlined(
+                  child: ListTile(
+                    leading: const Icon(Icons.people_outline),
+                    title: Text(game.playerLimitLabel),
+                    subtitle: Text(
+                      game == _Game.callBreak
+                          ? 'Play with three CPU players or with friends on Wi-Fi.'
+                          : 'Private rooms are in development.',
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
