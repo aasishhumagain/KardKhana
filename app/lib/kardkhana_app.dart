@@ -1,5 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'call_break/call_break_game.dart';
+import 'call_break/call_break_page.dart';
+
 class KardKhanaApp extends StatelessWidget {
   const KardKhanaApp({super.key});
 
@@ -31,7 +34,7 @@ enum _Game {
     'Bid on how many tricks you expect to win, then play each trick and '
         'see how your result compares with your bid.',
     Icons.flag_outlined,
-    maximumPlayers: 4,
+    maximumPlayers: CallBreakGame.playerCount,
     requiresFullTable: true,
   ),
   teenPatti(
@@ -205,14 +208,41 @@ class _GameDetails extends StatelessWidget {
                   child: ListTile(
                     leading: const Icon(Icons.people_outline),
                     title: Text(game.playerLimitLabel),
-                    subtitle: const Text('Private rooms are in development.'),
+                    subtitle: Text(
+                      game == _Game.callBreak
+                          ? 'Play on the same Wi-Fi network or phone hotspot.'
+                          : 'Private rooms are in development.',
+                    ),
                   ),
                 ),
+                if (game == _Game.callBreak) ...[
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton(
+                        onPressed: () => _openSetup(context, host: true),
+                        child: const Text('Host room'),
+                      ),
+                      OutlinedButton(
+                        onPressed: () => _openSetup(context, host: false),
+                        child: const Text('Join room'),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  void _openSetup(BuildContext context, {required bool host}) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => CallBreakSetupPage(host: host)),
     );
   }
 }

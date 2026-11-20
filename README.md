@@ -24,11 +24,19 @@ the catalog navigation.
 
 ## Current milestone
 
-The Android prototype opens in landscape and shows each game's player limit
-in the catalog and on its detail screen. Call Break requires exactly four
-players to start. Teen Patti and Marriage each allow up to five players.
-Gameplay and private rooms are planned for later milestones.
+Call Break is playable in landscape with four people on the same Wi-Fi network
+or phone hotspot. One player opens **Call Break → Host room**, enters a nickname,
+and shares the host IP and six-digit room code. The other three use **Join room**
+and enter those details. The host can start when all four seats are ready.
 
-Next, agree on one rule variant per game and record worked scoring examples.
-Then prototype a phone-hosted room on two physical Android devices with internet
-access disabled and use Call Break to exercise the shared room and game interfaces.
+Each match has five rounds. Players bid from 1 to 13 and can lead any suit.
+Follow the led suit if possible, otherwise play a spade if you have one. Among
+eligible cards, play one that would win the trick if you can. The trick winner
+leads next. A bid of 4 earns 4.0 for four tricks, 4.2 for six tricks, and −4.0
+for three tricks. The highest total wins and equal totals share the win.
+[Call Break rules reference](https://bhoos.games/blog/call-break-rules-how-to-play-callbreak/)
+
+The host validates turns and sends each player their own hand. The room stays
+open while the host keeps the table open. A player leaving mid-match ends that
+match. Teen Patti and Marriage each have a five-player cap and are at the
+catalog stage. Internet play is planned for the Go backend.
