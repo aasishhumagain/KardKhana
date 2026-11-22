@@ -2,6 +2,11 @@ import 'package:material_ui/material_ui.dart';
 
 import 'call_break/call_break_game.dart';
 import 'call_break/call_break_page.dart';
+import 'marriage/marriage_game.dart';
+import 'marriage/marriage_page.dart';
+import 'offline/offline_table_widgets.dart';
+import 'teen_patti/teen_patti_game.dart';
+import 'teen_patti/teen_patti_page.dart';
 
 class KardKhanaApp extends StatelessWidget {
   const KardKhanaApp({super.key});
@@ -43,7 +48,7 @@ enum _Game {
     'Play with a three-card hand and virtual points. At a showdown, hands '
         'are compared to resolve the round.',
     Icons.layers_outlined,
-    maximumPlayers: 5,
+    maximumPlayers: TeenPattiGame.maxPlayers,
   ),
   marriage(
     'Marriage',
@@ -51,7 +56,7 @@ enum _Game {
     'Draw and discard cards to build valid groups. Choose the cards in '
         'each group when you make a declaration.',
     Icons.style_outlined,
-    maximumPlayers: 5,
+    maximumPlayers: MarriageGame.maxPlayers,
   );
 
   const _Game(
@@ -202,15 +207,15 @@ class _GameDetails extends StatelessWidget {
               children: [
                 Text(game.summary, style: theme.textTheme.headlineMedium),
                 const SizedBox(height: 12),
-                if (game == _Game.callBreak) ...[
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    children: [
-                      FilledButton(
-                        onPressed: () => openOfflineCallBreak(context),
-                        child: const Text('Play offline'),
-                      ),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton(
+                      onPressed: () => _openOffline(context),
+                      child: const Text('Play offline'),
+                    ),
+                    if (game != _Game.marriage) ...[
                       OutlinedButton(
                         onPressed: () => _openSetup(context, host: true),
                         child: const Text('Host room'),
@@ -220,9 +225,9 @@ class _GameDetails extends StatelessWidget {
                         child: const Text('Join room'),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 16),
-                ],
+                  ],
+                ),
+                const SizedBox(height: 16),
                 Text(game.description, style: theme.textTheme.bodyLarge),
                 const SizedBox(height: 24),
                 Card.outlined(
@@ -230,9 +235,9 @@ class _GameDetails extends StatelessWidget {
                     leading: const Icon(Icons.people_outline),
                     title: Text(game.playerLimitLabel),
                     subtitle: Text(
-                      game == _Game.callBreak
-                          ? 'Play with three CPU players or with friends on Wi-Fi.'
-                          : 'Private rooms are in development.',
+                      game == _Game.marriage
+                          ? 'Choose a table size and play with CPU opponents.'
+                          : 'Play with CPU opponents or with friends on Wi-Fi.',
                     ),
                   ),
                 ),
@@ -244,9 +249,49 @@ class _GameDetails extends StatelessWidget {
     );
   }
 
+  void _openOffline(BuildContext context) {
+    switch (game) {
+      case _Game.callBreak:
+        openOfflineCallBreak(context);
+      case _Game.teenPatti:
+        _openOfflineSetup(
+          context,
+          minPlayers: TeenPattiGame.minPlayers,
+          buildGame: (count) => TeenPattiPage(playerCount: count),
+        );
+      case _Game.marriage:
+        _openOfflineSetup(
+          context,
+          minPlayers: MarriageGame.minPlayers,
+          buildGame: (count) => MarriagePage(playerCount: count),
+        );
+    }
+  }
+
+  void _openOfflineSetup(
+    BuildContext context, {
+    required int minPlayers,
+    required Widget Function(int) buildGame,
+  }) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => OfflineGameSetup(
+          title: game.title,
+          minPlayers: minPlayers,
+          maxPlayers: game.maximumPlayers,
+          buildGame: buildGame,
+        ),
+      ),
+    );
+  }
+
   void _openSetup(BuildContext context, {required bool host}) {
     Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => CallBreakSetupPage(host: host)),
+      MaterialPageRoute<void>(
+        builder: (_) => game == _Game.callBreak
+            ? CallBreakSetupPage(host: host)
+            : TeenPattiSetupPage(host: host),
+      ),
     );
   }
 }

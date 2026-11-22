@@ -1,12 +1,7 @@
-import 'package:flutter/foundation.dart';
-
+import '../table_session.dart';
 import 'call_break_game.dart';
 
-abstract class CallBreakSession extends ChangeNotifier {
-  Map<String, dynamic> get view;
-
-  void send(String action, [Map<String, Object?> fields = const {}]);
-}
+typedef CallBreakSession = TableSession;
 
 Map<String, dynamic> callBreakTableView(
   CallBreakGame? game,

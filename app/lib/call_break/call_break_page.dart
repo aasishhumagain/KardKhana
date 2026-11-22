@@ -1,7 +1,6 @@
-import 'dart:io';
-
 import 'package:material_ui/material_ui.dart';
 
+import '../lan/lan_room_setup_page.dart';
 import 'call_break_game.dart';
 import 'call_break_room.dart';
 import 'call_break_session.dart';
@@ -14,157 +13,21 @@ void openOfflineCallBreak(BuildContext context) {
   );
 }
 
-class CallBreakSetupPage extends StatefulWidget {
+class CallBreakSetupPage extends StatelessWidget {
   const CallBreakSetupPage({required this.host, super.key});
 
   final bool host;
 
   @override
-  State<CallBreakSetupPage> createState() => _CallBreakSetupPageState();
-}
-
-class _CallBreakSetupPageState extends State<CallBreakSetupPage> {
-  final _form = GlobalKey<FormState>();
-  final _name = TextEditingController();
-  final _address = TextEditingController();
-  final _code = TextEditingController();
-  bool _busy = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _address.dispose();
-    _code.dispose();
-    super.dispose();
-  }
-
-  Future<void> _enterRoom() async {
-    if (_busy || !_form.currentState!.validate()) return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-
-    CallBreakRoom? room;
-    try {
-      final name = _name.text.trim();
-      room = widget.host
-          ? await CallBreakRoom.host(name)
-          : await CallBreakRoom.join(
-              _address.text.trim(),
-              name,
-              _code.text.trim(),
-            );
-      final addresses = widget.host ? await _localAddresses() : <String>[];
-      if (!mounted) {
-        room.dispose();
-        return;
-      }
-      final enteredRoom = room;
-      Navigator.of(context).pushReplacement<void, void>(
-        MaterialPageRoute<void>(
-          builder: (_) =>
-              _CallBreakTable(session: enteredRoom, addresses: addresses),
-        ),
-      );
-    } catch (error) {
-      room?.dispose();
-      if (!mounted) return;
-      setState(() {
-        _busy = false;
-        _error = error is CallBreakRoomException
-            ? error.message
-            : widget.host
-            ? 'Could not host. Close any existing room and try again.'
-            : 'Could not connect. Check the host IP and join the same network.';
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final action = widget.host ? 'Host room' : 'Join room';
-    return Scaffold(
-      appBar: AppBar(title: Text(action)),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500),
-            child: Form(
-              key: _form,
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  TextFormField(
-                    controller: _name,
-                    enabled: !_busy,
-                    maxLength: 20,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: const InputDecoration(labelText: 'Nickname'),
-                    validator: (value) =>
-                        value!.trim().isEmpty ? 'Enter a nickname.' : null,
-                  ),
-                  if (!widget.host) ...[
-                    TextFormField(
-                      controller: _address,
-                      enabled: !_busy,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Host IP address',
-                      ),
-                      validator: (value) =>
-                          InternetAddress.tryParse(value!.trim())?.type ==
-                              InternetAddressType.IPv4
-                          ? null
-                          : 'Enter an IPv4 address.',
-                    ),
-                    TextFormField(
-                      controller: _code,
-                      enabled: !_busy,
-                      keyboardType: TextInputType.number,
-                      maxLength: 6,
-                      decoration: const InputDecoration(labelText: 'Room code'),
-                      validator: (value) =>
-                          RegExp(r'^\d{6}$').hasMatch(value!.trim())
-                          ? null
-                          : 'Enter the six-digit room code.',
-                    ),
-                  ],
-                  if (_error case final error?)
-                    _Message(text: error, isError: true),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: _busy ? null : _enterRoom,
-                    child: Text(_busy ? 'Connecting…' : action),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-Future<List<String>> _localAddresses() async {
-  try {
-    final interfaces = await NetworkInterface.list(
-      type: InternetAddressType.IPv4,
-    );
-    final wifi = interfaces.where(
-      (interface) => RegExp(r'^(wlan|wifi|ap)').hasMatch(interface.name),
-    );
-    return [
-      for (final interface in wifi.isEmpty ? interfaces : wifi)
-        for (final address in interface.addresses) address.address,
-    ];
-  } on SocketException {
-    return [];
-  }
+  Widget build(BuildContext context) => LanRoomSetupPage<CallBreakRoom>(
+    host: host,
+    minPlayers: CallBreakGame.playerCount,
+    maxPlayers: CallBreakGame.playerCount,
+    createRoom: (name, _) => CallBreakRoom.host(name),
+    joinRoom: CallBreakRoom.join,
+    buildTable: (room, addresses) =>
+        _CallBreakTable(session: room, addresses: addresses),
+  );
 }
 
 class _CallBreakTable extends StatefulWidget {

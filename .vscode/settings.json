@@ -1,0 +1,5 @@
+{
+  "emulator.emulatorPathWindows": "%LOCALAPPDATA%\\Android\\Sdk\\emulator",
+  "emulator.androidExtraBootArgs": "-no-snapshot-load",
+  "task.allowAutomaticTasks": "on"
+}

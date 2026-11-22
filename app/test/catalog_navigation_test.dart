@@ -44,18 +44,36 @@ void main() {
       expect(find.text(game.key), findsOneWidget);
       expect(find.text(game.value.summary), findsOneWidget);
 
+      final offline = find.widgetWithText(FilledButton, 'Play offline');
+      expect(offline.hitTestable(), findsOneWidget);
+      await tester.tap(offline);
+      await tester.pumpAndSettle();
+      expect(find.text('${game.key} · Offline'), findsOneWidget);
       if (game.key == 'Call Break') {
-        final offline = find.widgetWithText(FilledButton, 'Play offline');
-        expect(offline.hitTestable(), findsOneWidget);
-        await tester.tap(offline);
-        await tester.pumpAndSettle();
-        expect(find.text('Call Break · Offline'), findsOneWidget);
         for (var cpu = 1; cpu <= 3; cpu++) {
           expect(find.text('CPU $cpu'), findsOneWidget);
         }
-        await tester.pageBack();
+      } else {
+        await tester.tap(find.widgetWithText(ChoiceChip, '5 players'));
+        await tester.tap(find.widgetWithText(FilledButton, 'Start game'));
         await tester.pumpAndSettle();
+        expect(find.text('CPU 4'), findsOneWidget);
+        expect(find.text('CPU 5'), findsNothing);
+        if (game.key == 'Teen Patti') {
+          await tester.tap(find.widgetWithText(OutlinedButton, 'Look'));
+          await tester.pumpAndSettle();
+          expect(find.textContaining('Your hand ·'), findsOneWidget);
+        } else {
+          await tester.tap(find.textContaining('Draw stock'));
+          await tester.pumpAndSettle();
+          expect(
+            find.textContaining('Lay a group or discard one card'),
+            findsOneWidget,
+          );
+        }
       }
+      await tester.pageBack();
+      await tester.pumpAndSettle();
 
       final playerLimit = find.text(game.value.limit);
       await tester.scrollUntilVisible(playerLimit, 80);
