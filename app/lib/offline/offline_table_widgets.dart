@@ -21,52 +21,75 @@ class OfflineGameSetup extends StatefulWidget {
 }
 
 class _OfflineGameSetupState extends State<OfflineGameSetup> {
-  int _players = 4;
+  late int _players = 4.clamp(widget.minPlayers, widget.maxPlayers).toInt();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('${widget.title} · Offline')),
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            Text('Table size', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 620),
+            child: ListView(
+              padding: const EdgeInsets.all(12),
               children: [
-                for (
-                  var count = widget.minPlayers;
-                  count <= widget.maxPlayers;
-                  count++
-                )
-                  ChoiceChip(
-                    label: Text('$count players'),
-                    selected: _players == count,
-                    onSelected: (_) => setState(() => _players = count),
+                Card.outlined(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      spacing: 8,
+                      children: [
+                        Text(
+                          'Table size',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: [
+                            for (
+                              var count = widget.minPlayers;
+                              count <= widget.maxPlayers;
+                              count++
+                            )
+                              ChoiceChip(
+                                label: Text('$count players'),
+                                selected: _players == count,
+                                onSelected: (_) =>
+                                    setState(() => _players = count),
+                              ),
+                          ],
+                        ),
+                        const Divider(height: 1),
+                        Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 14,
+                          children: [
+                            Text('You and ${_players - 1} CPU players'),
+                            FilledButton.icon(
+                              onPressed: () {
+                                final count = _players;
+                                Navigator.of(context)
+                                    .pushReplacement<void, void>(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) => widget.buildGame(count),
+                                      ),
+                                    );
+                              },
+                              icon: const Icon(Icons.play_arrow_rounded),
+                              label: const Text('Start game'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
+                ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text('You and ${_players - 1} CPU players'),
-            const SizedBox(height: 16),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FilledButton(
-                onPressed: () {
-                  final count = _players;
-                  Navigator.of(context).pushReplacement<void, void>(
-                    MaterialPageRoute<void>(
-                      builder: (_) => widget.buildGame(count),
-                    ),
-                  );
-                },
-                child: const Text('Start game'),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

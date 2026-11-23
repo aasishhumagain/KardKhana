@@ -8,6 +8,7 @@ class PlayingCard extends StatelessWidget {
     this.wild = false,
     this.selected = false,
     this.portrait = false,
+    this.compact = false,
     this.dimmed = false,
     this.onPressed,
     super.key,
@@ -18,6 +19,7 @@ class PlayingCard extends StatelessWidget {
       wild = false,
       selected = false,
       portrait = true,
+      compact = false,
       dimmed = false,
       onPressed = null,
       _faceDown = true;
@@ -26,6 +28,7 @@ class PlayingCard extends StatelessWidget {
   final bool wild;
   final bool selected;
   final bool portrait;
+  final bool compact;
   final bool dimmed;
   final VoidCallback? onPressed;
   final bool _faceDown;
@@ -35,8 +38,16 @@ class PlayingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = portrait ? 50.0 : 44.0;
-    final height = portrait ? 67.0 : 59.0;
+    final width = compact
+        ? 40.0
+        : portrait
+        ? 50.0
+        : 44.0;
+    final height = compact
+        ? 54.0
+        : portrait
+        ? 67.0
+        : 59.0;
     if (_faceDown) {
       return Semantics(
         label: 'Face-down card',
@@ -47,11 +58,11 @@ class PlayingCard extends StatelessWidget {
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
               borderRadius: _corners,
-              border: Border.all(color: const Color(0xFF704885)),
+              border: Border.all(color: const Color(0xFF9D854D)),
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF673E7C), Color(0xFF351D4C)],
+                colors: [Color(0xFF3B4F3D), Color(0xFF202F28)],
               ),
               boxShadow: const [
                 BoxShadow(
@@ -79,16 +90,16 @@ class PlayingCard extends StatelessWidget {
     final suit = face == null ? null : cardSuit(face);
     final rank = face == null ? 'Joker' : cardRankLabel(face);
     final red = suit == CardSuit.diamonds || suit == CardSuit.hearts;
-    final baseInk = red ? const Color(0xFFB02A49) : const Color(0xFF261D32);
+    final baseInk = red ? const Color(0xFFA02E40) : const Color(0xFF1B2821);
     final ink = dimmed
         ? Color.lerp(baseInk, const Color(0xFFDED7CD), .27)!
         : baseInk;
     final label = suit == null ? rank : '$rank ${suit.name}';
     final border = selected
-        ? const Color(0xFF7C4598)
+        ? const Color(0xFFAC751D)
         : onPressed != null
-        ? const Color(0xFF9980AD)
-        : const Color(0xFFCFC3CE);
+        ? const Color(0xFFBDAA87)
+        : const Color(0xFFD9CEB6);
 
     return Semantics(
       label: wild ? '$label, wild' : label,
@@ -106,7 +117,7 @@ class PlayingCard extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: selected
-                    ? const Color(0x55714389)
+                    ? const Color(0x855B400F)
                     : const Color(0x231E1330),
                 offset: Offset(0, selected ? 4 : 2),
                 blurRadius: selected ? 6 : 3,
@@ -115,7 +126,7 @@ class PlayingCard extends StatelessWidget {
           ),
           child: Material(
             color: selected
-                ? const Color(0xFFF4E6FC)
+                ? const Color(0xFFFFECC3)
                 : dimmed
                 ? const Color(0xFFEDE7DF)
                 : const Color(0xFFFFFCF5),
@@ -142,7 +153,11 @@ class PlayingCard extends StatelessWidget {
                         child: _SuitMark(
                           suit,
                           color: ink,
-                          size: portrait ? 24 : 21,
+                          size: compact
+                              ? 18
+                              : portrait
+                              ? 24
+                              : 21,
                         ),
                       ),
                       Positioned(
@@ -178,8 +193,8 @@ class PlayingCard extends StatelessWidget {
                       ),
                     if (wild)
                       Positioned(
-                        top: 4,
-                        right: 4,
+                        top: 3,
+                        right: 3,
                         child: DecoratedBox(
                           decoration: BoxDecoration(
                             color: const Color(0xFFF7DCA4),

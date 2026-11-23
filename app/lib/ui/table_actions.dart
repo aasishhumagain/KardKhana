@@ -19,14 +19,14 @@ class TableAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final text = Text(label);
+    final text = Text(label, textAlign: TextAlign.center);
     final content = icon == null
         ? text
         : Row(
             mainAxisSize: MainAxisSize.min,
             spacing: 6,
             children: [
-              Icon(icon, size: 17),
+              Icon(icon, size: 16),
               Flexible(child: text),
             ],
           );
@@ -41,6 +41,7 @@ class TableAction extends StatelessWidget {
       minimumSize: const Size(44, 44),
       padding: padding,
       textStyle: textStyle,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
     );
 
     return switch (tone) {
@@ -61,6 +62,7 @@ class TableAction extends StatelessWidget {
           minimumSize: const Size(44, 44),
           padding: padding,
           textStyle: textStyle,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
         child: content,
       ),
@@ -81,7 +83,7 @@ class TableActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    const padding = EdgeInsets.fromLTRB(12, 4, 12, 6);
+    const padding = EdgeInsets.fromLTRB(10, 3, 10, 4);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colors.surfaceContainerLow,
@@ -91,11 +93,11 @@ class TableActionBar extends StatelessWidget {
           ? SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               padding: padding,
-              child: Row(spacing: 6, children: actions),
+              child: Row(spacing: 3, children: actions),
             )
           : Padding(
               padding: padding,
-              child: Wrap(spacing: 8, runSpacing: 4, children: actions),
+              child: Wrap(spacing: 6, runSpacing: 4, children: actions),
             ),
     );
   }

@@ -62,6 +62,8 @@ class _CallBreakTableState extends State<_CallBreakTable> {
         final phase = view['phase'] as String;
         final players = (view['players'] as List).cast<Map<String, dynamic>>();
         final seat = view['seat'] as int;
+        final connected = room?.connected ?? true;
+        final canAdvance = (room?.isHost ?? true) && connected;
 
         return GameTableScreen(
           title: room == null ? 'Call Break · Offline' : 'Call Break',
@@ -70,10 +72,7 @@ class _CallBreakTableState extends State<_CallBreakTable> {
           onDealFinished: session is OfflineCallBreak
               ? session.completeDeal
               : null,
-          actions:
-              phase == 'bidding' &&
-                  seat == view['turn'] &&
-                  (room?.connected ?? true)
+          actions: phase == 'bidding' && seat == view['turn'] && connected
               ? TableActionBar(
                   scrollHorizontally: true,
                   actions: [
@@ -82,6 +81,21 @@ class _CallBreakTableState extends State<_CallBreakTable> {
                         label: '$bid',
                         onPressed: () => session.send('bid', {'bid': bid}),
                       ),
+                  ],
+                )
+              : canAdvance && (phase == 'roundEnd' || phase == 'matchEnd')
+              ? TableActionBar(
+                  actions: [
+                    TableAction(
+                      label: phase == 'roundEnd'
+                          ? 'Deal next round'
+                          : 'Rematch',
+                      icon: Icons.refresh_rounded,
+                      tone: TableActionTone.primary,
+                      onPressed: () => session.send(
+                        phase == 'roundEnd' ? 'next' : 'rematch',
+                      ),
+                    ),
                   ],
                 )
               : null,
@@ -97,16 +111,9 @@ class _CallBreakTableState extends State<_CallBreakTable> {
                       'Return to the catalog to join a new room.',
                 )
               else if (room != null && phase == 'lobby')
-                ..._buildLobby(room, players, seat)
+                LanRoomLobby(room: room, addresses: widget.addresses)
               else
-                ..._buildMatch(
-                  session,
-                  view,
-                  players,
-                  seat,
-                  phase,
-                  canAdvance: room?.isHost ?? true,
-                ),
+                ..._buildMatch(session, view, players, seat, phase),
             ],
           ),
         );
@@ -114,54 +121,13 @@ class _CallBreakTableState extends State<_CallBreakTable> {
     );
   }
 
-  List<Widget> _buildLobby(
-    CallBreakRoom room,
-    List<Map<String, dynamic>> players,
-    int seat,
-  ) {
-    final ready = players[seat]['ready'] == true;
-    final canStart = players.every((player) => player['ready'] == true);
-    final occupied = players.where((player) => player['name'] != null).length;
-    return [
-      if (room.isHost)
-        _Message(
-          text:
-              'Room code ${room.roomCode}   •   '
-              'Host IP ${widget.addresses.isEmpty ? 'Use the host’s network settings' : widget.addresses.join(' or ')}',
-        ),
-      _Message(
-        text:
-            '$occupied / ${CallBreakGame.playerCount} seated. '
-            'All four players must be ready.',
-      ),
-      _Seats(players: players, localSeat: seat),
-      const SizedBox(height: 12),
-      Wrap(
-        spacing: 12,
-        runSpacing: 8,
-        children: [
-          OutlinedButton(
-            onPressed: () => room.send('ready', {'ready': !ready}),
-            child: Text(ready ? 'Not ready' : 'Ready'),
-          ),
-          if (room.isHost)
-            FilledButton(
-              onPressed: canStart ? () => room.send('start') : null,
-              child: const Text('Start match'),
-            ),
-        ],
-      ),
-    ];
-  }
-
   List<Widget> _buildMatch(
     CallBreakSession session,
     Map<String, dynamic> view,
     List<Map<String, dynamic>> players,
     int seat,
-    String phase, {
-    required bool canAdvance,
-  }) {
+    String phase,
+  ) {
     final round = view['round'] as int;
     final turn = view['turn'] as int;
     final bidding = phase == 'bidding';
@@ -179,11 +145,9 @@ class _CallBreakTableState extends State<_CallBreakTable> {
     final trick = (view['trick'] as List).cast<List<dynamic>>();
     final lastTrick = (view['lastTrick'] as List).cast<List<dynamic>>();
     final lastWinner = view['lastWinner'] as int?;
-    final trickSummary = [
-      if (trick.isNotEmpty) 'Current trick   ${_describeTrick(trick, players)}',
-      if (lastWinner != null)
-        'Last trick · ${players[lastWinner]['name']} won   '
-            '${_describeTrick(lastTrick, players)}',
+    final names = [
+      for (var index = 0; index < players.length; index++)
+        index == seat ? 'You' : players[index]['name'] as String,
     ];
     final status = switch (phase) {
       'bidding' when turn == seat => 'Your bid',
@@ -204,59 +168,169 @@ class _CallBreakTableState extends State<_CallBreakTable> {
         yourTurn: (bidding || playing) && seat == turn,
         complete: roundEnd || matchEnd,
       ),
-      const SizedBox(height: 8),
+      const SizedBox(height: 5),
       _Seats(
         players: players,
         localSeat: seat,
         activeSeat: bidding || playing ? turn : null,
         showScores: roundEnd || matchEnd,
       ),
-      const SizedBox(height: 8),
-      if (!bidding)
-        _Message(
-          text: trickSummary.isEmpty
-              ? 'Spades are trump.'
-              : trickSummary.join('\n'),
+      if (!bidding) ...[
+        const SizedBox(height: 6),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 8,
+          children: [
+            if (playing)
+              Expanded(
+                child: _Trick(
+                  title: 'Current trick',
+                  detail: '♠ Trump',
+                  plays: trick,
+                  names: names,
+                ),
+              ),
+            if (lastWinner != null)
+              Expanded(
+                child: _Trick(
+                  title: 'Last trick',
+                  detail: '${names[lastWinner]} won',
+                  plays: lastTrick,
+                  names: names,
+                ),
+              ),
+          ],
         ),
-      if (hand.isNotEmpty)
+      ],
+      if (hand.isNotEmpty) ...[
+        const SizedBox(height: 6),
         CardTray(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              spacing: 6,
-              children: [
-                for (final card in hand)
-                  PlayingCard(
-                    card,
-                    key: ValueKey(card),
-                    dimmed: playing && seat == turn && !legal.contains(card),
-                    onPressed: legal.contains(card)
-                        ? () => session.send('play', {'card': card})
-                        : null,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 620;
+              return Center(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    spacing: compact ? 3 : 5,
+                    children: [
+                      for (final card in hand)
+                        PlayingCard(
+                          card,
+                          key: ValueKey(card),
+                          compact: compact,
+                          dimmed:
+                              playing && seat == turn && !legal.contains(card),
+                          onPressed: legal.contains(card)
+                              ? () => session.send('play', {'card': card})
+                              : null,
+                        ),
+                    ],
                   ),
-              ],
-            ),
+                ),
+              );
+            },
           ),
         ),
-      if (canAdvance && (roundEnd || matchEnd))
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton(
-            onPressed: () => session.send(roundEnd ? 'next' : 'rematch'),
-            child: Text(roundEnd ? 'Deal next round' : 'Rematch'),
-          ),
-        ),
+      ],
     ];
   }
 }
 
-String _describeTrick(
-  List<List<dynamic>> trick,
-  List<Map<String, dynamic>> players,
-) => [
-  for (final play in trick)
-    '${players[play[0] as int]['name']} ${cardLabel(play[1] as int)}',
-].join('   •   ');
+class _Trick extends StatelessWidget {
+  const _Trick({
+    required this.title,
+    required this.detail,
+    required this.plays,
+    required this.names,
+  });
+
+  final String title;
+  final String detail;
+  final List<List<dynamic>> plays;
+  final List<String> names;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    return CardTray(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: 4,
+        children: [
+          Row(
+            spacing: 4,
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Flexible(
+                child: Text(
+                  detail,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (plays.isEmpty)
+            SizedBox(
+              height: 56,
+              child: Center(
+                child: Text(
+                  'Waiting for the lead',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            )
+          else
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              spacing: 3,
+              children: [
+                for (final play in plays)
+                  Flexible(
+                    child: SizedBox(
+                      width: 46,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        spacing: 2,
+                        children: [
+                          SizedBox(
+                            height: 38,
+                            child: FittedBox(
+                              child: PlayingCard(play[1] as int),
+                            ),
+                          ),
+                          Text(
+                            names[play[0] as int],
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelSmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
 
 String _points(int tenths) => (tenths / 10).toStringAsFixed(1);
 
@@ -276,10 +350,11 @@ class _Seats extends StatelessWidget {
   @override
   Widget build(BuildContext context) => TableSeats(
     activeSeat: activeSeat,
+    statusLines: showScores ? 2 : 1,
     names: [
       for (var seat = 0; seat < players.length; seat++)
         seat == localSeat
-            ? '${players[seat]['name']} (you)'
+            ? 'You'
             : players[seat]['name'] as String? ?? 'Open seat',
     ],
     status: [

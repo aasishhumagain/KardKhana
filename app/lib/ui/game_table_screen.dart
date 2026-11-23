@@ -91,7 +91,8 @@ class _GameTableScreenState extends State<GameTableScreen> {
     final sounds = <CardSound>[];
     var localAction = false;
     for (final entry in after.skip(overlap)) {
-      if (entry.round != widget.view['round'] || entry.move == TableMove.result) {
+      if (entry.round != widget.view['round'] ||
+          entry.move == TableMove.result) {
         continue;
       }
       localAction |= entry.seat == widget.view['seat'];
@@ -190,7 +191,10 @@ class _GameTableScreenState extends State<GameTableScreen> {
           ),
         ),
         titleSpacing: 4,
-        title: Text(_showLog ? 'Game log' : widget.title),
+        title: Text(
+          _showLog ? 'Game log' : widget.title,
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
       body: SafeArea(
         child: Stack(
@@ -203,12 +207,17 @@ class _GameTableScreenState extends State<GameTableScreen> {
                 child: IndexedStack(
                   index: _showLog ? 1 : 0,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(child: widget.table),
-                        ?widget.actions,
-                      ],
+                    TableBoard(
+                      active:
+                          widget.view['phase'] != 'lobby' &&
+                          widget.view['phase'] != 'ended',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(child: widget.table),
+                          ?widget.actions,
+                        ],
+                      ),
                     ),
                     if (_showLog)
                       _GameLog(
@@ -248,7 +257,8 @@ class _GameLog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     if (entries.isEmpty) {
       return const Center(
         child: Padding(
@@ -261,27 +271,51 @@ class _GameLog extends StatelessWidget {
       padding: tablePadding,
       primary: false,
       itemCount: entries.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 6),
+      separatorBuilder: (context, index) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final entry = entries[entries.length - 1 - index];
-        return Card.outlined(
-          child: ListTile(
-            dense: true,
-            leading: CircleAvatar(
-              radius: 17,
-              backgroundColor: colors.primaryContainer,
-              foregroundColor: colors.onPrimaryContainer,
-              child: Icon(switch (entry.move) {
-                TableMove.draw => Icons.download_rounded,
-                TableMove.discard => Icons.upload_rounded,
-                TableMove.play => Icons.style_outlined,
-                TableMove.decision => Icons.more_horiz,
-                TableMove.result => Icons.emoji_events_outlined,
-              }, size: 18),
-            ),
-            title: Text(playerName(entry.seat)),
-            subtitle: Text(entry.message),
-            trailing: Text('$roundLabel ${entry.round}'),
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+          child: Row(
+            spacing: 10,
+            children: [
+              CircleAvatar(
+                radius: 14,
+                backgroundColor: colors.primaryContainer,
+                foregroundColor: colors.onPrimaryContainer,
+                child: Icon(switch (entry.move) {
+                  TableMove.draw => Icons.download_rounded,
+                  TableMove.discard => Icons.upload_rounded,
+                  TableMove.play => Icons.style_outlined,
+                  TableMove.decision => Icons.more_horiz,
+                  TableMove.result => Icons.emoji_events_outlined,
+                }, size: 15),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 1,
+                  children: [
+                    Text(
+                      playerName(entry.seat),
+                      style: theme.textTheme.labelLarge,
+                    ),
+                    Text(
+                      entry.message,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                '$roundLabel ${entry.round}',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
         );
       },

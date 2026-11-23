@@ -39,12 +39,21 @@ class KardKhanaApp extends StatelessWidget {
 
   static ThemeData _theme(Brightness brightness) {
     final dark = brightness == Brightness.dark;
-    final colors = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF59186E),
-      brightness: brightness,
-    );
+    final colors =
+        ColorScheme.fromSeed(
+          seedColor: const Color(0xFF37604D),
+          brightness: brightness,
+        ).copyWith(
+          surface: dark ? const Color(0xFF1B211D) : const Color(0xFFF7F4EB),
+          surfaceContainerLow: dark
+              ? const Color(0xFF222B24)
+              : const Color(0xFFFFFCF3),
+          outlineVariant: dark
+              ? const Color(0xFF3B4C41)
+              : const Color(0xFFD4DAD0),
+        );
     final buttonShape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(9),
     );
     return ThemeData(
       filledButtonTheme: FilledButtonThemeData(
@@ -54,18 +63,22 @@ class KardKhanaApp extends StatelessWidget {
         style: OutlinedButton.styleFrom(shape: buttonShape),
       ),
       colorScheme: colors,
-      scaffoldBackgroundColor: dark
-          ? const Color(0xFF19131D)
-          : const Color(0xFFF9F7F1),
+      scaffoldBackgroundColor: colors.surface,
       appBarTheme: AppBarTheme(
-        toolbarHeight: 48,
-        backgroundColor: dark
-            ? const Color(0xFF2B1935)
-            : const Color(0xFF421053),
-        foregroundColor: Colors.white,
+        toolbarHeight: 44,
+        scrolledUnderElevation: 0,
+        backgroundColor: colors.surface,
+        foregroundColor: colors.onSurface,
+        titleTextStyle: TextStyle(
+          color: colors.onSurface,
+          fontFamily: 'Roboto',
+          fontSize: 17,
+          fontWeight: FontWeight.w800,
+        ),
       ),
       cardTheme: CardThemeData(
-        color: dark ? colors.surfaceContainerLow : Colors.white,
+        color: colors.surfaceContainerLow,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: EdgeInsets.zero,
       ),
     );
@@ -80,7 +93,7 @@ enum _Game {
         'see how your result compares with your bid.',
     minPlayers: CallBreakGame.playerCount,
     maximumPlayers: CallBreakGame.playerCount,
-    colors: [Color(0xFF143D35), Color(0xFF387259)],
+    colors: [Color(0xFF16392F), Color(0xFF305747)],
     coverCards: [38, 51, 50],
   ),
   teenPatti(
@@ -90,7 +103,7 @@ enum _Game {
         'are compared to resolve the round.',
     minPlayers: TeenPattiGame.minPlayers,
     maximumPlayers: TeenPattiGame.maxPlayers,
-    colors: [Color(0xFF482453), Color(0xFF85547F)],
+    colors: [Color(0xFF302841), Color(0xFF5B4965)],
     coverCards: [12, 25, 38],
   ),
   marriage(
@@ -100,7 +113,7 @@ enum _Game {
         'each group when you make a declaration.',
     minPlayers: MarriageGame.minPlayers,
     maximumPlayers: MarriageGame.maxPlayers,
-    colors: [Color(0xFF6D343D), Color(0xFFA26050)],
+    colors: [Color(0xFF522C32), Color(0xFF824741)],
     coverCards: [17, 18, 19],
   );
 
@@ -151,14 +164,14 @@ class _GameCatalog extends StatelessWidget {
               constraints: const BoxConstraints(maxWidth: 1100),
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final sideBySide = constraints.maxWidth >= 615;
+                  final sideBySide = constraints.maxWidth >= 530;
                   final cards = [
                     for (final game in _Game.values)
                       _GameCard(game: game, fillHeight: sideBySide),
                   ];
 
                   return ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
                     children: [
                       _CatalogHeader(
                         onSettings: () => Navigator.of(context).push<void>(
@@ -168,12 +181,12 @@ class _GameCatalog extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 9),
                       if (sideBySide)
                         IntrinsicHeight(
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
-                            spacing: 12,
+                            spacing: 10,
                             children: [
                               for (final card in cards) Expanded(child: card),
                             ],
@@ -182,7 +195,7 @@ class _GameCatalog extends StatelessWidget {
                       else
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
-                          spacing: 12,
+                          spacing: 8,
                           children: cards,
                         ),
                     ],
@@ -205,48 +218,31 @@ class _CatalogHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF2C1838), Color(0xFF573063)],
+    return Row(
+      spacing: 12,
+      children: [
+        Image.asset(
+          'assets/branding/kardkhana_logo.png',
+          width: 79,
+          height: 50,
+          fit: BoxFit.contain,
+          semanticLabel: 'KardKhana',
+        ),
+        Expanded(
+          child: Text(
+            'Choose a game',
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              letterSpacing: -.55,
+            ),
           ),
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          child: Row(
-            spacing: 14,
-            children: [
-              Image.asset(
-                'assets/branding/kardkhana_logo.png',
-                width: 104,
-                height: 65,
-                fit: BoxFit.contain,
-                semanticLabel: 'KardKhana',
-              ),
-              Expanded(
-                child: Text(
-                  'Choose a game',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    color: const Color(0xFFFFF4DF),
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              IconButton(
-                tooltip: 'Settings',
-                style: IconButton.styleFrom(
-                  foregroundColor: const Color(0xFFF6D590),
-                  backgroundColor: const Color(0x26FFFFFF),
-                ),
-                icon: const Icon(Icons.settings_outlined),
-                onPressed: onSettings,
-              ),
-            ],
-          ),
+        IconButton.outlined(
+          tooltip: 'Settings',
+          icon: const Icon(Icons.settings_outlined, size: 21),
+          onPressed: onSettings,
         ),
-      ),
+      ],
     );
   }
 }
@@ -262,7 +258,7 @@ class _GameCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final caption = Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      padding: const EdgeInsets.fromLTRB(10, 7, 10, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         spacing: 4,
@@ -273,25 +269,25 @@ class _GameCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   game.title,
-                  style: theme.textTheme.titleLarge?.copyWith(
+                  style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
               Icon(
                 Icons.arrow_forward_rounded,
-                size: 18,
+                size: 16,
                 color: colors.primary,
               ),
             ],
           ),
           Text(
             game.summary,
-            style: theme.textTheme.bodyMedium?.copyWith(
+            style: theme.textTheme.bodySmall?.copyWith(
               color: colors.onSurfaceVariant,
             ),
           ),
-          if (fillHeight) const Spacer() else const SizedBox(height: 2),
+          if (fillHeight) const Spacer(),
           _PlayerCount(label: game.tableSize),
         ],
       ),
@@ -299,7 +295,7 @@ class _GameCard extends StatelessWidget {
     return Card.outlined(
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: colors.outlineVariant),
       ),
       child: InkWell(
@@ -338,7 +334,7 @@ class _GameArtwork extends StatelessWidget {
           ),
         ),
         child: SizedBox(
-          height: 94,
+          height: 90,
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -423,11 +419,11 @@ class _PlayerCount extends StatelessWidget {
     return Row(
       spacing: 6,
       children: [
-        Icon(Icons.people_outline, size: 16, color: theme.colorScheme.primary),
+        Icon(Icons.people_outline, size: 15, color: theme.colorScheme.primary),
         Flexible(
           child: Text(
             label,
-            style: theme.textTheme.labelLarge?.copyWith(
+            style: theme.textTheme.labelMedium?.copyWith(
               color: theme.colorScheme.primary,
             ),
           ),
@@ -447,15 +443,15 @@ class _GameDetails extends StatelessWidget {
     final theme = Theme.of(context);
     final overview = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
-      spacing: 9,
+      spacing: 6,
       children: [
         ClipRRect(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           child: _GameArtwork(game: game),
         ),
         Text(
           game.summary,
-          style: theme.textTheme.titleLarge?.copyWith(
+          style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -465,10 +461,10 @@ class _GameDetails extends StatelessWidget {
     );
     final play = Card.outlined(
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
-          spacing: 10,
+          spacing: 6,
           children: [
             FilledButton(
               onPressed: () => _openOffline(context),
@@ -517,11 +513,11 @@ class _GameDetails extends StatelessWidget {
             constraints: const BoxConstraints(maxWidth: 960),
             child: LayoutBuilder(
               builder: (context, constraints) => ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(12),
                 children: [
-                  if (constraints.maxWidth >= 620)
+                  if (constraints.maxWidth >= 520)
                     Row(
-                      spacing: 16,
+                      spacing: 10,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(flex: 6, child: overview),
@@ -598,6 +594,9 @@ class _ActionLabel extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     mainAxisSize: MainAxisSize.min,
     spacing: 6,
-    children: [Icon(icon, size: 17), Text(label)],
+    children: [
+      Icon(icon, size: 17),
+      Flexible(child: Text(label, textAlign: TextAlign.center)),
+    ],
   );
 }

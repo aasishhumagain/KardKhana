@@ -92,84 +92,117 @@ class _LanRoomSetupPageState<Room extends LanRoom<Object>>
   @override
   Widget build(BuildContext context) {
     final action = widget.host ? 'Host room' : 'Join room';
+    final theme = Theme.of(context);
+    final nickname = TextFormField(
+      controller: _name,
+      enabled: !_busy,
+      maxLength: 20,
+      textCapitalization: TextCapitalization.words,
+      decoration: _field('Nickname', Icons.person_outline),
+      validator: (value) => value!.trim().isEmpty ? 'Enter a nickname.' : null,
+    );
+    final address = TextFormField(
+      controller: _address,
+      enabled: !_busy,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: _field('Host IP address', Icons.wifi_rounded),
+      validator: (value) =>
+          InternetAddress.tryParse(value!.trim())?.type ==
+              InternetAddressType.IPv4
+          ? null
+          : 'Enter an IPv4 address.',
+    );
+    final code = TextFormField(
+      controller: _code,
+      enabled: !_busy,
+      keyboardType: TextInputType.number,
+      maxLength: 6,
+      decoration: _field('Room code', Icons.pin_outlined),
+      validator: (value) => RegExp(r'^\d{6}$').hasMatch(value!.trim())
+          ? null
+          : 'Enter the six-digit room code.',
+    );
     return Scaffold(
       appBar: AppBar(title: Text(action)),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 500),
+            constraints: const BoxConstraints(maxWidth: 650),
             child: Form(
               key: _form,
               child: ListView(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(12),
                 children: [
-                  TextFormField(
-                    controller: _name,
-                    enabled: !_busy,
-                    maxLength: 20,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: const InputDecoration(labelText: 'Nickname'),
-                    validator: (value) =>
-                        value!.trim().isEmpty ? 'Enter a nickname.' : null,
-                  ),
-                  if (widget.host && widget.minPlayers < widget.maxPlayers)
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: [
-                        for (
-                          var count = widget.minPlayers;
-                          count <= widget.maxPlayers;
-                          count++
-                        )
-                          ChoiceChip(
-                            label: Text('$count players'),
-                            selected: _players == count,
-                            onSelected: _busy
-                                ? null
-                                : (_) => setState(() => _players = count),
+                  Card.outlined(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        spacing: 9,
+                        children: [
+                          const Text(
+                            'Use the same Wi-Fi or hotspot as the other players.',
                           ),
-                      ],
-                    ),
-                  if (!widget.host) ...[
-                    TextFormField(
-                      controller: _address,
-                      enabled: !_busy,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
+                          nickname,
+                          if (widget.host &&
+                              widget.minPlayers < widget.maxPlayers)
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: [
+                                for (
+                                  var count = widget.minPlayers;
+                                  count <= widget.maxPlayers;
+                                  count++
+                                )
+                                  ChoiceChip(
+                                    label: Text('$count players'),
+                                    selected: _players == count,
+                                    onSelected: _busy
+                                        ? null
+                                        : (_) =>
+                                              setState(() => _players = count),
+                                  ),
+                              ],
+                            ),
+                          if (!widget.host)
+                            LayoutBuilder(
+                              builder: (context, limits) =>
+                                  limits.maxWidth >= 385
+                                  ? Row(
+                                      spacing: 8,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(flex: 3, child: address),
+                                        Expanded(flex: 2, child: code),
+                                      ],
+                                    )
+                                  : Column(
+                                      spacing: 8,
+                                      children: [address, code],
+                                    ),
+                            ),
+                          if (_error case final error?)
+                            Text(
+                              error,
+                              style: TextStyle(color: theme.colorScheme.error),
+                            ),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: FilledButton.icon(
+                              onPressed: _busy ? null : _enterRoom,
+                              icon: Icon(
+                                widget.host
+                                    ? Icons.add_rounded
+                                    : Icons.login_rounded,
+                              ),
+                              label: Text(_busy ? 'Connecting…' : action),
+                            ),
+                          ),
+                        ],
                       ),
-                      decoration: const InputDecoration(
-                        labelText: 'Host IP address',
-                      ),
-                      validator: (value) =>
-                          InternetAddress.tryParse(value!.trim())?.type ==
-                              InternetAddressType.IPv4
-                          ? null
-                          : 'Enter an IPv4 address.',
                     ),
-                    TextFormField(
-                      controller: _code,
-                      enabled: !_busy,
-                      keyboardType: TextInputType.number,
-                      maxLength: 6,
-                      decoration: const InputDecoration(labelText: 'Room code'),
-                      validator: (value) =>
-                          RegExp(r'^\d{6}$').hasMatch(value!.trim())
-                          ? null
-                          : 'Enter the six-digit room code.',
-                    ),
-                  ],
-                  if (_error case final error?)
-                    Text(
-                      error,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: _busy ? null : _enterRoom,
-                    child: Text(_busy ? 'Connecting…' : action),
                   ),
                 ],
               ),
@@ -179,6 +212,15 @@ class _LanRoomSetupPageState<Room extends LanRoom<Object>>
       ),
     );
   }
+
+  InputDecoration _field(String label, IconData icon) => InputDecoration(
+    labelText: label,
+    prefixIcon: Icon(icon, size: 19),
+    counterText: '',
+    isDense: true,
+    filled: true,
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+  );
 }
 
 Future<List<String>> _localAddresses() async {
@@ -206,6 +248,7 @@ class LanRoomLobby extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final players = (room.view['players'] as List).cast<Map<String, dynamic>>();
     final seat = room.view['seat'] as int;
     final ready = players[seat]['ready'] == true;
@@ -213,14 +256,31 @@ class LanRoomLobby extends StatelessWidget {
     final occupied = players.where((player) => player['name'] != null).length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: 12,
+      spacing: 8,
       children: [
         if (room.isHost)
-          SelectableText(
-            'Room code ${room.roomCode}   •   '
-            'Host IP ${addresses.isEmpty ? 'Use the host’s network settings' : addresses.join(' or ')}',
+          Card.outlined(
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Wrap(
+                spacing: 24,
+                runSpacing: 7,
+                children: [
+                  _RoomDetail(label: 'Room code', value: room.roomCode ?? ''),
+                  _RoomDetail(
+                    label: 'Host IP',
+                    value: addresses.isEmpty
+                        ? 'Check the host’s network settings'
+                        : addresses.join(' · '),
+                  ),
+                ],
+              ),
+            ),
           ),
-        Text('$occupied / ${players.length} seated. All seats must be ready.'),
+        Text(
+          '$occupied of ${players.length} seated · Everyone must be ready',
+          style: theme.textTheme.bodySmall,
+        ),
         TableSeats(
           names: [
             for (var index = 0; index < players.length; index++)
@@ -239,8 +299,8 @@ class LanRoomLobby extends StatelessWidget {
           ],
         ),
         Wrap(
-          spacing: 12,
-          runSpacing: 8,
+          spacing: 8,
+          runSpacing: 4,
           children: [
             OutlinedButton(
               onPressed: () => room.send('ready', {'ready': !ready}),
@@ -252,6 +312,29 @@ class LanRoomLobby extends StatelessWidget {
                 child: const Text('Start match'),
               ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+class _RoomDetail extends StatelessWidget {
+  const _RoomDetail({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: style.labelMedium),
+        SelectableText(
+          value,
+          style: style.titleMedium?.copyWith(fontWeight: FontWeight.w700),
         ),
       ],
     );

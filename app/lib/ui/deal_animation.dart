@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../cards/playing_card.dart';
 import '../settings/game_feedback.dart';
+import 'table_widgets.dart';
 
 class DealAnimation extends StatefulWidget {
   const DealAnimation({
@@ -96,10 +97,7 @@ class _DealAnimationState extends State<DealAnimation>
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
-            gradient: const RadialGradient(
-              radius: 1.05,
-              colors: [Color(0xFF346055), Color(0xFF1B3A33)],
-            ),
+            gradient: tableFelt,
             border: Border.all(color: const Color(0xFF60796F)),
           ),
           child: LayoutBuilder(

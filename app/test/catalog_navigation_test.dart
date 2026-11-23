@@ -107,9 +107,6 @@ void main() {
           );
         }
         final fourthCpu = find.text('CPU 4');
-        if (game.key == 'Marriage') {
-          await tester.scrollUntilVisible(fourthCpu, 60);
-        }
         expect(fourthCpu.hitTestable(), findsOneWidget);
         expect(find.text('CPU 5'), findsNothing);
       }
@@ -130,9 +127,11 @@ void main() {
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(800, 360);
+    tester.view.physicalSize = const Size(800, 296);
+    tester.view.padding = const FakeViewPadding(top: 24, right: 36);
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetPadding);
     final appearance = ValueNotifier(ThemeMode.light);
     addTearDown(appearance.dispose);
     await tester.pumpWidget(KardKhanaApp(appearance: appearance));
@@ -205,8 +204,10 @@ void main() {
   ) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(640, 320);
+    tester.view.padding = const FakeViewPadding(top: 24, right: 36);
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetPadding);
     final appearance = ValueNotifier(ThemeMode.dark);
     addTearDown(appearance.dispose);
     await tester.pumpWidget(KardKhanaApp(appearance: appearance));
@@ -216,6 +217,20 @@ void main() {
       expect(find.text(name).hitTestable(), findsOneWidget);
     }
     expect(find.byTooltip('Settings').hitTestable(), findsOneWidget);
+
+    for (final target in [
+      find.text('Marriage'),
+      find.text('Play offline'),
+      find.text('5 players'),
+      find.text('Start game'),
+      find.textContaining('Draw stock'),
+    ]) {
+      await tester.tap(target.hitTestable());
+      await tester.pumpAndSettle();
+    }
+    expect(find.byType(PlayingCard).hitTestable(), findsNWidgets(22));
+    expect(find.text('CPU 4').hitTestable(), findsOneWidget);
+    expect(find.text('Discard selected').hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

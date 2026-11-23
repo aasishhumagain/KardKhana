@@ -124,9 +124,7 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
       title: room == null ? 'Teen Patti · Offline' : 'Teen Patti',
       view: view,
       onDealFinished: room == null ? _scheduleCpu : null,
-      actions: phase == 'playing' && (room?.connected ?? true)
-          ? _turnActions(view)
-          : null,
+      actions: (room?.connected ?? true) ? _tableActions(view, phase) : null,
       table: ListView(
         padding: tablePadding,
         children: [
@@ -149,7 +147,24 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
     );
   }
 
-  Widget? _turnActions(Map<String, dynamic> view) {
+  Widget? _tableActions(Map<String, dynamic> view, String phase) {
+    if (phase == 'roundEnd' && (widget.room?.isHost ?? true)) {
+      final local = (view['players'] as List)[view['seat'] as int] as Map;
+      final reset =
+          view['canDeal'] == false ||
+          (widget.room == null && local['points'] == 0);
+      return TableActionBar(
+        actions: [
+          TableAction(
+            label: reset ? 'Reset points' : 'Next hand',
+            icon: Icons.refresh_rounded,
+            tone: TableActionTone.primary,
+            onPressed: () => _next(reset: reset),
+          ),
+        ],
+      );
+    }
+    if (phase != 'playing') return null;
     final available = view['actions'] as List;
     if (available.isEmpty) return null;
 
@@ -200,9 +215,6 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
     final ownHand = (view['hand'] as List).cast<int>();
     final winners = (view['winners'] as List).cast<int>();
     final pot = view['pot'] as int;
-    final reset =
-        view['canDeal'] == false ||
-        (widget.room == null && players[seat]['points'] == 0);
     final winnerVerb = winners.length == 1 && winners.single != seat
         ? 'wins'
         : winners.length == 1
@@ -221,7 +233,7 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
         yourTurn: !complete && turn == seat,
         complete: complete,
       ),
-      const SizedBox(height: 8),
+      const SizedBox(height: 5),
       TableSeats(
         activeSeat: complete ? null : turn,
         names: names,
@@ -230,63 +242,72 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
             '${player['points']} points · ${player['note']}',
         ],
       ),
-      const SizedBox(height: 12),
-      if (ownHand.isNotEmpty)
-        _handRow('Your hand', ownHand)
-      else if (!complete && players[seat]['note'] != 'Out of points')
-        const Wrap(
-          spacing: 6,
+      const SizedBox(height: 8),
+      if (complete)
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 8,
           runSpacing: 6,
-          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            CardTray(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                spacing: 6,
-                children: [
-                  PlayingCard.faceDown(),
-                  PlayingCard.faceDown(),
-                  PlayingCard.faceDown(),
-                ],
-              ),
-            ),
-            Text('Your cards are face down. Look to play seen.'),
+            if (ownHand.isNotEmpty)
+              _shownHand('Your hand', ownHand, compact: true),
+            for (var i = 0; i < players.length; i++)
+              if (i != seat && (players[i]['reveal'] as List).isNotEmpty)
+                _shownHand(
+                  names[i],
+                  (players[i]['reveal'] as List).cast<int>(),
+                  compact: true,
+                ),
           ],
-        ),
-      if (complete) ...[
-        for (var i = 0; i < players.length; i++)
-          if (i != seat && (players[i]['reveal'] as List).isNotEmpty)
-            _handRow(names[i], (players[i]['reveal'] as List).cast<int>()),
-        if (widget.room?.isHost ?? true)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton(
-              onPressed: () => _next(reset: reset),
-              child: Text(reset ? 'Reset points' : 'Next hand'),
+        )
+      else if (ownHand.isNotEmpty)
+        Center(child: _shownHand('Your hand', ownHand))
+      else if (!complete && players[seat]['note'] != 'Out of points')
+        const Center(
+          child: CardTray(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              spacing: 5,
+              children: [
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  spacing: 6,
+                  children: [
+                    PlayingCard.faceDown(),
+                    PlayingCard.faceDown(),
+                    PlayingCard.faceDown(),
+                  ],
+                ),
+                Text('Blind · Tap Look to see your cards'),
+              ],
             ),
           ),
-      ],
+        ),
     ];
   }
 }
 
-Widget _handRow(String title, List<int> hand) => Padding(
-  padding: const EdgeInsets.only(bottom: 8),
-  child: Wrap(
-    spacing: 6,
-    runSpacing: 4,
-    crossAxisAlignment: WrapCrossAlignment.center,
-    children: [
-      CardTray(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          spacing: 6,
-          children: [
-            for (final card in hand) PlayingCard(card, portrait: true),
-          ],
-        ),
+Widget _shownHand(String title, List<int> hand, {bool compact = false}) =>
+    CardTray(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 4,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            spacing: 5,
+            children: [
+              for (final card in hand)
+                PlayingCard(card, portrait: !compact, compact: compact),
+            ],
+          ),
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: compact ? 130 : 220),
+            child: Text(
+              '$title · ${rankTeenPattiHand(hand).kind.label}',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ],
       ),
-      Text('$title · ${rankTeenPattiHand(hand).kind.label}'),
-    ],
-  ),
-);
+    );

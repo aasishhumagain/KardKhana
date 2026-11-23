@@ -165,12 +165,25 @@ class _MarriagePageState extends State<MarriagePage> {
   Widget _table(BuildContext context, Map<String, dynamic> view) {
     final room = widget.room;
     final phase = view['phase'] as String;
+    final connected = room?.connected ?? true;
     return GameTableScreen(
       title: room == null ? 'Marriage · Offline' : 'Marriage',
       view: view,
       onDealFinished: room == null ? _scheduleCpu : null,
-      actions: phase == 'playing' && (room?.connected ?? true)
+      actions: phase == 'playing' && connected
           ? _turnActions(view)
+          : phase == 'roundEnd' && connected && (room?.isHost ?? true)
+          ? TableActionBar(
+              actions: [
+                TableAction(
+                  label: 'Next hand',
+                  icon: Icons.refresh_rounded,
+                  tone: TableActionTone.primary,
+                  onPressed: () =>
+                      _submit('next', const {}, () => _game.nextRound()),
+                ),
+              ],
+            )
           : null,
       table: ListView(
         padding: tablePadding,
@@ -188,7 +201,7 @@ class _MarriagePageState extends State<MarriagePage> {
           else if (room != null && phase == 'lobby')
             LanRoomLobby(room: room, addresses: widget.addresses)
           else
-            ..._match(context, view, complete: phase == 'roundEnd'),
+            ..._match(view, complete: phase == 'roundEnd'),
         ],
       ),
     );
@@ -209,6 +222,7 @@ class _MarriagePageState extends State<MarriagePage> {
     final discardable = view['discardable'] as List;
 
     return TableActionBar(
+      scrollHorizontally: true,
       actions: [
         if (afterDraw)
           TableAction(
@@ -274,12 +288,7 @@ class _MarriagePageState extends State<MarriagePage> {
     );
   }
 
-  List<Widget> _match(
-    BuildContext context,
-    Map<String, dynamic> view, {
-    required bool complete,
-  }) {
-    final theme = Theme.of(context);
+  List<Widget> _match(Map<String, dynamic> view, {required bool complete}) {
     final players = (view['players'] as List).cast<Map<String, dynamic>>();
     final seat = view['seat'] as int;
     final turn = view['turn'] as int;
@@ -290,10 +299,12 @@ class _MarriagePageState extends State<MarriagePage> {
     final yourTurn = !complete && turn == seat;
     final hasDrawn = view['hasDrawn'] as bool;
     final dublees = players[seat]['dublees'] as int? ?? 0;
-    final progress = dublees == 0
-        ? 'Hand ${view['round']}'
-        : 'Hand ${view['round']} · $dublees/${MarriageGame.dubleesToWin} Dublees';
     final maal = view['maal'] as int?;
+    final progress = [
+      'Hand ${view['round']}',
+      if (dublees > 0) '$dublees/${MarriageGame.dubleesToWin} Dublees',
+      if (maal != null && !complete) 'Maal ${cardLabel(maal)}',
+    ].join(' · ');
     final winner = view['winner'] as int?;
     final hand = (view['hand'] as List).cast<int>();
     final status = complete
@@ -321,66 +332,71 @@ class _MarriagePageState extends State<MarriagePage> {
         yourTurn: yourTurn,
         complete: complete,
       ),
-      const SizedBox(height: 8),
-      if (!complete) ...[
-        if (_message case final message?) ...[
-          Text(message, style: TextStyle(color: theme.colorScheme.error)),
-          const SizedBox(height: 4),
-        ],
-        CardTray(
-          child: Wrap(
-            spacing: 6,
-            runSpacing: 8,
-            children: [
-              for (final card in hand)
-                PlayingCard(
-                  isPrintedJoker(card) ? null : marriageFace(card),
-                  key: ValueKey(card),
-                  wild: maal != null && isMarriageWild(card, maal),
-                  selected: _selected.contains(card),
-                  onPressed: yourTurn
-                      ? () => _toggleCard(
-                          card,
-                          dublees == MarriageGame.dubleesToReveal
-                              ? dubleeSize
-                              : marriageGroupSize,
-                        )
-                      : null,
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          maal == null
-              ? 'Reveal the maal with three pure groups or seven Dublees.'
-              : dublees > 0
-              ? 'Maal · ${cardLabel(maal)}   Dublees need two identical cards.'
-              : 'Maal · ${cardLabel(maal)}   Wild cards may complete runs and trials.',
-        ),
-        const SizedBox(height: 8),
-      ],
+      const SizedBox(height: 4),
       TableSeats(
         activeSeat: complete ? null : turn,
+        statusLines: complete ? 3 : 1,
         names: names,
         status: [
           for (final player in players)
             complete
                 ? '${player['roundPoints']} this hand · ${player['points']} total · ${player['maalPoints'] ?? 0} maal'
                 : (player['dublees'] as int? ?? 0) > 0
-                ? '${player['dublees']}/${MarriageGame.dubleesToWin} Dublees · ${player['note']}'
-                : '${player['groups']}/${MarriageGame.groupsToWin} groups · ${player['note']}',
+                ? '${player['dublees']}/${MarriageGame.dubleesToWin} Dublees'
+                : '${player['groups']}/${MarriageGame.groupsToWin} groups',
         ],
       ),
-      const SizedBox(height: 8),
-      if (complete && (widget.room?.isHost ?? true))
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FilledButton(
-            onPressed: () => _submit('next', const {}, () => _game.nextRound()),
-            child: const Text('Next hand'),
+      if (!complete) ...[
+        const SizedBox(height: 4),
+        if (_message case final message?) ...[
+          Builder(
+            builder: (context) => Text(
+              message,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+          const SizedBox(height: 4),
+        ],
+        CardTray(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 4,
+                runSpacing: 6,
+                children: [
+                  for (final card in hand)
+                    PlayingCard(
+                      isPrintedJoker(card) ? null : marriageFace(card),
+                      key: ValueKey(card),
+                      compact: true,
+                      wild: maal != null && isMarriageWild(card, maal),
+                      selected: _selected.contains(card),
+                      onPressed: yourTurn
+                          ? () => _toggleCard(
+                              card,
+                              dublees == MarriageGame.dubleesToReveal
+                                  ? dubleeSize
+                                  : marriageGroupSize,
+                            )
+                          : null,
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
+        const SizedBox(height: 5),
+        Text(
+          maal == null
+              ? 'Reveal the maal with three pure groups or seven Dublees.'
+              : dublees > 0
+              ? 'Dublees need two identical cards.'
+              : 'Wild cards may complete runs and trials.',
+          textAlign: TextAlign.center,
+        ),
+      ],
     ];
   }
 }
