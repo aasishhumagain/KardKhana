@@ -62,7 +62,7 @@ class PlayingCard extends StatelessWidget {
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF3B4F3D), Color(0xFF202F28)],
+                colors: [Color(0xFF693484), Color(0xFF2B1043)],
               ),
               boxShadow: const [
                 BoxShadow(

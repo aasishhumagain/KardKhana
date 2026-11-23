@@ -41,16 +41,16 @@ class KardKhanaApp extends StatelessWidget {
     final dark = brightness == Brightness.dark;
     final colors =
         ColorScheme.fromSeed(
-          seedColor: const Color(0xFF37604D),
+          seedColor: const Color(0xFF651B7B),
           brightness: brightness,
         ).copyWith(
-          surface: dark ? const Color(0xFF1B211D) : const Color(0xFFF7F4EB),
+          surface: dark ? const Color(0xFF24162D) : const Color(0xFFF9F3EC),
           surfaceContainerLow: dark
-              ? const Color(0xFF222B24)
+              ? const Color(0xFF31213C)
               : const Color(0xFFFFFCF3),
           outlineVariant: dark
-              ? const Color(0xFF3B4C41)
-              : const Color(0xFFD4DAD0),
+              ? const Color(0xFF5A4266)
+              : const Color(0xFFDED0E3),
         );
     final buttonShape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(9),

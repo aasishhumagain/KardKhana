@@ -8,6 +8,7 @@ import '../lan/lan_room_setup_page.dart';
 import '../offline/offline_table_widgets.dart';
 import '../offline/offline_turn_pacing.dart';
 import '../ui/game_table_screen.dart';
+import '../ui/card_flights.dart';
 import '../ui/table_actions.dart';
 import '../ui/table_scene.dart';
 import '../ui/table_widgets.dart';
@@ -126,7 +127,9 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
       view: view,
       onDealFinished: room == null ? _scheduleCpu : null,
       actions: (room?.connected ?? true) ? _tableActions(view, phase) : null,
-      table: phase == 'playing' && (room?.connected ?? true)
+      table:
+          (phase == 'playing' || phase == 'roundEnd') &&
+              (room?.connected ?? true)
           ? _match(view, notice: room?.notice)
           : ListView(
               padding: tablePadding,
@@ -144,9 +147,7 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
                         'Return to the catalog to join a new room.',
                   )
                 else if (room != null && phase == 'lobby')
-                  LanRoomLobby(room: room, addresses: widget.addresses)
-                else
-                  _match(view),
+                  LanRoomLobby(room: room, addresses: widget.addresses),
               ],
             ),
     );
@@ -232,43 +233,14 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
         ? 'Your turn'
         : '${names[turn]} is playing';
 
-    final progress = 'Hand ${view['round']}';
-    if (complete) {
-      return Column(
-        spacing: 8,
-        children: [
-          TableStatus(
-            progress: '$progress · Pot $pot',
-            status: banner,
-            yourTurn: false,
-            complete: true,
-          ),
-          TableSeats(
-            names: names,
-            status: [
-              for (final player in players)
-                '${player['points']} points · ${player['note']}',
-            ],
-          ),
-          Wrap(
-            alignment: WrapAlignment.center,
-            spacing: 8,
-            runSpacing: 6,
-            children: [
-              if (ownHand.isNotEmpty)
-                _shownHand('Your hand', ownHand, compact: true),
-              for (var i = 0; i < players.length; i++)
-                if (i != seat && (players[i]['reveal'] as List).isNotEmpty)
-                  _shownHand(
-                    names[i],
-                    (players[i]['reveal'] as List).cast<int>(),
-                    compact: true,
-                  ),
-            ],
-          ),
-        ],
-      );
-    }
+    final round = view['round'] as int;
+    final packed = players[seat]['note'] == 'Packed';
+    final reveals = [
+      if (ownHand.isNotEmpty) _shownHand('Your hand', ownHand),
+      for (var i = 0; i < players.length; i++)
+        if (i != seat && (players[i]['reveal'] as List).isNotEmpty)
+          _shownHand(names[i], (players[i]['reveal'] as List).cast<int>()),
+    ];
 
     return TableScene(
       seats: [
@@ -279,10 +251,22 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
           ),
       ],
       localSeat: seat,
-      activeSeat: turn,
+      activeSeat: complete ? null : turn,
       status: banner,
-      progress: progress,
+      progress: 'Hand $round',
       notice: notice,
+      round: round,
+      landingZone: LandingZone.fold,
+      cards: [
+        for (var i = 0; i < players.length; i++)
+          if (players[i]['note'] == 'Packed')
+            for (var copy = 0; copy < 3; copy++)
+              (
+                serial: i * 3 + copy,
+                seat: i,
+                face: const ExcludeSemantics(child: PlayingCard.faceDown()),
+              ),
+      ],
       center: Column(
         mainAxisSize: MainAxisSize.min,
         spacing: 2,
@@ -305,54 +289,77 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
               ),
             ],
           ),
-          if (ownHand.isNotEmpty)
+          if (!complete && !packed && ownHand.isNotEmpty)
             Text(
               'Your hand · ${rankTeenPattiHand(ownHand).kind.label}',
               textAlign: TextAlign.center,
             )
-          else if (players[seat]['note'] != 'Out of points')
+          else if (!complete &&
+              !packed &&
+              players[seat]['note'] != 'Out of points')
             const Text(
               'Tap Look to see your cards',
               textAlign: TextAlign.center,
             ),
         ],
       ),
-      hand: HandSpread(
-        large: true,
-        cards: [
-          if (ownHand.isNotEmpty)
-            for (final card in ownHand)
-              PlayingCard(card, key: ValueKey(card), portrait: true)
-          else if (players[seat]['note'] != 'Out of points')
-            for (var index = 0; index < 3; index++)
-              PlayingCard.faceDown(key: ValueKey(index)),
-        ],
+      hand: SizedBox(
+        height: 78,
+        child: complete
+            ? Center(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    spacing: 7,
+                    children: reveals,
+                  ),
+                ),
+              )
+            : HandSpread(
+                large: true,
+                cards: [
+                  if (!packed && ownHand.isNotEmpty)
+                    for (final card in ownHand)
+                      PlayingCard(card, key: ValueKey(card), portrait: true)
+                  else if (!packed && players[seat]['note'] != 'Out of points')
+                    for (var index = 0; index < 3; index++)
+                      PlayingCard.faceDown(key: ValueKey(index)),
+                ],
+              ),
       ),
     );
   }
 }
 
-Widget _shownHand(String title, List<int> hand, {bool compact = false}) =>
-    CardTray(
-      child: Column(
+Widget _shownHand(String title, List<int> hand) => CardTray(
+  child: Column(
+    mainAxisSize: MainAxisSize.min,
+    spacing: 4,
+    children: [
+      Row(
         mainAxisSize: MainAxisSize.min,
-        spacing: 4,
+        spacing: 5,
         children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            spacing: 5,
-            children: [
-              for (final card in hand)
-                PlayingCard(card, portrait: !compact, compact: compact),
-            ],
-          ),
-          ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: compact ? 130 : 220),
-            child: Text(
-              '$title · ${rankTeenPattiHand(hand).kind.label}',
-              textAlign: TextAlign.center,
+          for (final card in hand)
+            SizedBox(
+              height: 46,
+              child: FittedBox(child: PlayingCard(card, compact: true)),
             ),
-          ),
         ],
       ),
-    );
+      ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 123),
+        child: Builder(
+          builder: (context) => Text(
+            '$title · ${rankTeenPattiHand(hand).kind.label}',
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall,
+          ),
+        ),
+      ),
+    ],
+  ),
+);

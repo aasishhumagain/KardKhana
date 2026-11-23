@@ -9,6 +9,7 @@ import '../lan/lan_room_setup_page.dart';
 import '../offline/offline_table_widgets.dart';
 import '../offline/offline_turn_pacing.dart';
 import '../ui/game_table_screen.dart';
+import '../ui/card_flights.dart';
 import '../ui/table_actions.dart';
 import '../ui/table_scene.dart';
 import '../ui/table_widgets.dart';
@@ -186,7 +187,7 @@ class _MarriagePageState extends State<MarriagePage> {
               ],
             )
           : null,
-      table: phase == 'playing' && connected
+      table: (phase == 'playing' || phase == 'roundEnd') && connected
           ? _match(view, notice: room?.notice)
           : ListView(
               padding: tablePadding,
@@ -204,9 +205,7 @@ class _MarriagePageState extends State<MarriagePage> {
                         'Return to the catalog to join a new room.',
                   )
                 else if (room != null && phase == 'lobby')
-                  LanRoomLobby(room: room, addresses: widget.addresses)
-                else
-                  _match(view),
+                  LanRoomLobby(room: room, addresses: widget.addresses),
               ],
             ),
     );
@@ -305,30 +304,14 @@ class _MarriagePageState extends State<MarriagePage> {
               : 'Lay a group or draw a card'
         : '${names[turn]} is playing';
 
-    if (complete) {
-      return Column(
-        spacing: 8,
-        children: [
-          TableStatus(
-            progress: progress,
-            status: status,
-            yourTurn: false,
-            complete: true,
-          ),
-          TableSeats(
-            statusLines: 3,
-            names: names,
-            status: [
-              for (final player in players)
-                '${player['roundPoints']} this hand · ${player['points']} total · ${player['maalPoints'] ?? 0} maal',
-            ],
-          ),
-        ],
-      );
-    }
-
     final stock = view['stockCount'] as int;
     final discard = view['topDiscard'] as int?;
+    final round = view['round'] as int;
+    final discards =
+        (view['discardPile'] as List?)?.cast<List<dynamic>>() ??
+        [
+          if (discard != null) [discard, null, discard],
+        ];
     final canDraw = yourTurn && !hasDrawn;
     final canTake =
         canDraw && (view['canTakeDiscard'] as bool? ?? discard != null);
@@ -337,72 +320,87 @@ class _MarriagePageState extends State<MarriagePage> {
         for (var i = 0; i < players.length; i++)
           (
             name: names[i],
-            detail: [
-              if ((players[i]['dublees'] as int? ?? 0) > 0)
-                '${players[i]['dublees']}/${MarriageGame.dubleesToWin} Dublees'
-              else
-                '${players[i]['groups']}/${MarriageGame.groupsToWin} groups',
-              if (i == seat && maal != null) 'Maal ${cardLabel(maal)}',
-            ].join(' · '),
+            detail: complete
+                ? '${players[i]['roundPoints']} this hand · ${players[i]['points']} total · ${players[i]['maalPoints'] ?? 0} maal'
+                : [
+                    if ((players[i]['dublees'] as int? ?? 0) > 0)
+                      '${players[i]['dublees']}/${MarriageGame.dubleesToWin} Dublees'
+                    else
+                      '${players[i]['groups']}/${MarriageGame.groupsToWin} groups',
+                    if (i == seat && maal != null) 'Maal ${cardLabel(maal)}',
+                  ].join(' · '),
           ),
       ],
       localSeat: seat,
-      activeSeat: turn,
+      activeSeat: complete ? null : turn,
       progress: progress,
       status: status,
       notice: notice ?? _message,
-      center: Row(
-        spacing: 10,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Flexible(
-            child: _Pile(
-              label: canDraw && stock > 0
-                  ? 'Draw stock · $stock'
-                  : 'Stock · $stock',
-              card: stock > 0 ? const PlayingCard.faceDown() : null,
-              stacked: true,
-              onTap: canDraw && stock > 0
-                  ? () => _draw(fromDiscard: false)
-                  : null,
-            ),
-          ),
-          Flexible(
-            child: _Pile(
-              label: canTake && discard != null
-                  ? 'Take ${marriageCardLabel(discard)}'
-                  : 'Discard pile',
-              card: discard == null
-                  ? null
-                  : PlayingCard(
-                      isPrintedJoker(discard) ? null : marriageFace(discard),
-                      compact: true,
-                    ),
-              onTap: canTake ? () => _draw(fromDiscard: true) : null,
-            ),
-          ),
-        ],
-      ),
-      hand: HandSpread(
-        cards: [
-          for (final card in hand)
-            PlayingCard(
+      round: round,
+      landingZone: LandingZone.discard,
+      cards: [
+        for (final [int card, int? thrower, int serial] in discards)
+          (
+            serial: serial,
+            seat: thrower,
+            face: PlayingCard(
               isPrintedJoker(card) ? null : marriageFace(card),
-              key: ValueKey(card),
               compact: true,
-              wild: maal != null && isMarriageWild(card, maal),
-              selected: _selected.contains(card),
-              onPressed: yourTurn
-                  ? () => _toggleCard(
-                      card,
-                      dublees == MarriageGame.dubleesToReveal
-                          ? dubleeSize
-                          : marriageGroupSize,
-                    )
-                  : null,
             ),
+          ),
+      ],
+      center: Row(
+        children: [
+          Expanded(
+            child: Center(
+              child: _Pile(
+                label: canDraw && stock > 0
+                    ? 'Draw stock · $stock'
+                    : 'Stock · $stock',
+                card: stock > 0 ? const PlayingCard.faceDown() : null,
+                stacked: true,
+                onTap: canDraw && stock > 0
+                    ? () => _draw(fromDiscard: false)
+                    : null,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Center(
+              child: _Pile(
+                label: canTake && discard != null
+                    ? 'Take ${marriageCardLabel(discard)}'
+                    : 'Discard pile',
+                card: null,
+                occupied: discard != null,
+                onTap: canTake ? () => _draw(fromDiscard: true) : null,
+              ),
+            ),
+          ),
         ],
       ),
+      hand: complete
+          ? const SizedBox(height: 69)
+          : HandSpread(
+              cards: [
+                for (final card in hand)
+                  PlayingCard(
+                    isPrintedJoker(card) ? null : marriageFace(card),
+                    key: ValueKey(card),
+                    compact: true,
+                    wild: maal != null && isMarriageWild(card, maal),
+                    selected: _selected.contains(card),
+                    onPressed: yourTurn
+                        ? () => _toggleCard(
+                            card,
+                            dublees == MarriageGame.dubleesToReveal
+                                ? dubleeSize
+                                : marriageGroupSize,
+                          )
+                        : null,
+                  ),
+              ],
+            ),
     );
   }
 }
@@ -413,12 +411,14 @@ class _Pile extends StatelessWidget {
     required this.card,
     required this.onTap,
     this.stacked = false,
+    this.occupied = false,
   });
 
   final String label;
   final Widget? card;
   final VoidCallback? onTap;
   final bool stacked;
+  final bool occupied;
 
   @override
   Widget build(BuildContext context) => Material(
@@ -446,7 +446,7 @@ class _Pile extends StatelessWidget {
                       ),
                     if (card case final face?)
                       FittedBox(child: face)
-                    else
+                    else if (!occupied)
                       DecoratedBox(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(5),

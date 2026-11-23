@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'table_widgets.dart';
+
 enum TableActionTone { primary, secondary, caution }
 
 class TableAction extends StatelessWidget {
@@ -85,8 +87,8 @@ class TableActionBar extends StatelessWidget {
     const padding = EdgeInsets.fromLTRB(10, 3, 10, 4);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: const Color(0xFF1B192A),
-        border: const Border(top: BorderSide(color: Color(0xFF6B4B3B))),
+        color: tableRoom,
+        border: const Border(top: BorderSide(color: Color(0xFF80537D))),
       ),
       child: scrollHorizontally
           ? Center(

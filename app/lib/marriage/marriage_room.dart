@@ -100,6 +100,11 @@ Map<String, dynamic> marriageTableView(
   'winner': game?.winner,
   'stockCount': game?.stockCount ?? 0,
   'topDiscard': game?.topDiscard,
+  'discardPile': [
+    if (game != null)
+      for (final item in game.visibleDiscards)
+        [item.card, item.seat, item.serial],
+  ],
   'hasDrawn': game?.hasDrawn ?? false,
   'log': game?.logView,
 };
@@ -136,6 +141,11 @@ bool _validView(Map<String, dynamic> view) {
       view['stockCount'] is int &&
       view['hasDrawn'] is bool &&
       (view['topDiscard'] == null || _validCard(view['topDiscard'])) &&
+      _validDiscardPile(
+        view['discardPile'],
+        view['topDiscard'],
+        players.length,
+      ) &&
       (maal == null || (maal is int && maal >= 0 && maal < standardDeckSize)) &&
       (availableDublees == null ||
           (availableDublees is int &&
@@ -164,3 +174,23 @@ bool _validView(Map<String, dynamic> view) {
 
 bool _validCard(Object? card) =>
     card is int && card >= 0 && card < marriageDeckSize;
+
+bool _validDiscardPile(Object? pile, Object? top, int playerCount) {
+  if (pile == null) return true;
+  if (pile is! List || pile.length > visibleDiscardCount) return false;
+  if (pile.isEmpty) return top == null;
+  int previous = -1;
+  for (final entry in pile) {
+    if (entry case [final card, final seat, final int serial]
+        when _validCard(card) &&
+            serial > previous &&
+            (seat == null
+                ? serial == 0
+                : seat is int && seat >= 0 && seat < playerCount)) {
+      previous = serial;
+    } else {
+      return false;
+    }
+  }
+  return (pile.last as List).first == top;
+}

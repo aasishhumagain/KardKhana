@@ -392,6 +392,7 @@ void main() {
     await _waitForMarriage(host, () => host.notice != null);
     await act(0, 'discard', {'card': drawn});
     expect(host.view['topDiscard'], drawn);
+    expect((rooms[1].view['discardPile'] as List).last, [drawn, 0, 1]);
     expect((rooms[1].view['log'] as List).last, [
       1,
       0,
@@ -400,6 +401,11 @@ void main() {
     ]);
     await act(1, 'draw', {'fromDiscard': true});
     expect(rooms[1].view['hand'], contains(drawn));
+    expect((host.view['discardPile'] as List).last, [
+      host.view['topDiscard'],
+      null,
+      0,
+    ]);
     expect((host.view['log'] as List).last, [
       1,
       1,

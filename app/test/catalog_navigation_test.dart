@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kardkhana/cards/playing_card.dart';
 import 'package:kardkhana/kardkhana_app.dart';
+import 'package:kardkhana/ui/card_flights.dart';
 import 'package:kardkhana/ui/table_actions.dart';
 import 'package:kardkhana/ui/table_scene.dart';
 import 'package:material_ui/material_ui.dart';
@@ -187,6 +188,21 @@ void main() {
     expect(tester.getTopLeft(actions).dy, actionsTop);
     await tester.tap(find.text('Discard selected').hitTestable());
     await tester.pump();
+    final thrownCard = find
+        .descendant(
+          of: find.byType(CardFlights),
+          matching: find.byType(PlayingCard),
+        )
+        .last;
+    final launch = tester.getCenter(thrownCard);
+    await tester.pump(const Duration(milliseconds: 100));
+    final inFlight = tester.getCenter(thrownCard);
+    expect(inFlight.dy, lessThan(launch.dy));
+    await tester.pump(const Duration(milliseconds: 300));
+    final landed = tester.getCenter(thrownCard);
+    expect(landed, isNot(inFlight));
+    await tester.pump();
+    expect(tester.getCenter(thrownCard), landed);
     await tester.tap(log);
     await tester.pump();
     final draw = find.text('Drew a card from stock').hitTestable();

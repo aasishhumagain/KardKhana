@@ -1,11 +1,12 @@
 import 'package:material_ui/material_ui.dart';
 
 const tablePadding = EdgeInsets.fromLTRB(10, 6, 10, 8);
+const tableRoom = Color(0xFF240E34);
 
 const tableFelt = RadialGradient(
   center: Alignment(0, -.24),
   radius: 1.22,
-  colors: [Color(0xFF284E41), Color(0xFF122A23)],
+  colors: [Color(0xFF622879), tableRoom],
 );
 
 class TableBoard extends StatelessWidget {
@@ -21,19 +22,19 @@ class TableBoard extends StatelessWidget {
       ).copyWith(
         primary: const Color(0xFFF0CD8D),
         onPrimary: const Color(0xFF29210F),
-        primaryContainer: const Color(0xFF404633),
+        primaryContainer: const Color(0xFF633C70),
         onPrimaryContainer: const Color(0xFFFFE0A7),
-        surface: const Color(0xFF19332A),
-        surfaceContainerLowest: const Color(0xFF142B24),
-        surfaceContainerLow: const Color(0xFF173128),
-        surfaceContainer: const Color(0xFF234237),
-        surfaceContainerHigh: const Color(0xFF2B4F43),
-        secondaryContainer: const Color(0xFF33584B),
+        surface: const Color(0xFF361644),
+        surfaceContainerLowest: tableRoom,
+        surfaceContainerLow: const Color(0xFF351443),
+        surfaceContainer: const Color(0xFF4A2558),
+        surfaceContainerHigh: const Color(0xFF582F66),
+        secondaryContainer: const Color(0xFF583566),
         onSecondaryContainer: const Color(0xFFF6F0E1),
         onSurface: const Color(0xFFF6F0E1),
-        onSurfaceVariant: const Color(0xFFC1D1C6),
-        outline: const Color(0xFF839C8D),
-        outlineVariant: const Color(0xFF436759),
+        onSurfaceVariant: const Color(0xFFE0C9E8),
+        outline: const Color(0xFFB893C5),
+        outlineVariant: const Color(0xFF7C5689),
       );
 
   @override
@@ -78,70 +79,6 @@ class CardTray extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
         child: child,
-      ),
-    );
-  }
-}
-
-class TableStatus extends StatelessWidget {
-  const TableStatus({
-    required this.progress,
-    required this.status,
-    required this.yourTurn,
-    this.complete = false,
-    super.key,
-  });
-
-  final String progress;
-  final String status;
-  final bool yourTurn;
-  final bool complete;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final emphasized = yourTurn || complete;
-    final ink = emphasized ? colors.onPrimaryContainer : colors.onSurface;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: colors.outlineVariant)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(3, 0, 3, 3),
-        child: Row(
-          spacing: 7,
-          children: [
-            Icon(
-              complete
-                  ? Icons.emoji_events_outlined
-                  : yourTurn
-                  ? Icons.play_arrow_rounded
-                  : Icons.hourglass_bottom_rounded,
-              size: 16,
-              color: emphasized ? colors.primary : colors.onSurfaceVariant,
-            ),
-            Expanded(
-              child: Text(
-                status,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: ink,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 170),
-              child: Text(
-                progress,
-                textAlign: TextAlign.end,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

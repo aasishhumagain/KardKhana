@@ -22,4 +22,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/branding/kardkhana_logo.png
-    - assets/tables/blue_wood.jpg
+    - assets/tables/portraits/

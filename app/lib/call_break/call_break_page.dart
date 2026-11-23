@@ -100,7 +100,7 @@ class _CallBreakTableState extends State<_CallBreakTable> {
                   ],
                 )
               : null,
-          table: connected && (phase == 'bidding' || phase == 'playing')
+          table: connected && phase != 'lobby' && phase != 'ended'
               ? _buildMatch(
                   session,
                   view,
@@ -121,9 +121,7 @@ class _CallBreakTableState extends State<_CallBreakTable> {
                             'Return to the catalog to join a new room.',
                       )
                     else if (room != null && phase == 'lobby')
-                      LanRoomLobby(room: room, addresses: widget.addresses)
-                    else
-                      _buildMatch(session, view, players, seat, phase),
+                      LanRoomLobby(room: room, addresses: widget.addresses),
                   ],
                 ),
         );
@@ -173,54 +171,38 @@ class _CallBreakTableState extends State<_CallBreakTable> {
     };
 
     final progress = 'Round $round / ${CallBreakGame.roundsPerMatch}';
-    if (roundEnd || matchEnd) {
-      return Column(
-        spacing: 8,
-        children: [
-          TableStatus(
-            progress: progress,
-            status: status,
-            yourTurn: false,
-            complete: true,
-          ),
-          TableSeats(
-            names: names,
-            statusLines: 2,
-            status: [
-              for (final player in players)
-                'Round ${_points(player['roundScore'] as int)} · Total ${_points(player['score'] as int)}',
-            ],
-          ),
-          if (lastWinner != null)
-            Center(
-              child: SizedBox(
-                width: 280,
-                child: _Trick(
-                  title: 'Last trick',
-                  detail: '${names[lastWinner]} won',
-                  plays: lastTrick,
-                  names: names,
-                ),
-              ),
-            ),
-        ],
-      );
-    }
+    final completed = roundEnd || matchEnd;
+    final showingLast = trick.isEmpty && lastTrick.isNotEmpty;
+    final plays = showingLast ? lastTrick : trick;
     return TableScene(
       seats: [
         for (var i = 0; i < players.length; i++)
           (
             name: names[i],
-            detail: players[i]['bid'] == null
+            detail: completed
+                ? 'Round ${_points(players[i]['roundScore'] as int)} · Total ${_points(players[i]['score'] as int)}'
+                : players[i]['bid'] == null
                 ? 'Waiting to bid'
                 : 'Bid ${players[i]['bid']} · Won ${players[i]['tricks']}',
           ),
       ],
       localSeat: seat,
-      activeSeat: turn,
+      activeSeat: completed ? null : turn,
       status: status,
       progress: progress,
       notice: notice,
+      round: round,
+      cards: [
+        for (final [int thrower, int card] in plays)
+          (
+            serial: card,
+            seat: thrower,
+            face: Semantics(
+              label: '${names[thrower]} played',
+              child: PlayingCard(card, compact: true),
+            ),
+          ),
+      ],
       center: bidding
           ? const Column(
               mainAxisSize: MainAxisSize.min,
@@ -236,132 +218,38 @@ class _CallBreakTableState extends State<_CallBreakTable> {
                 Text('Spades are trump'),
               ],
             )
-          : Row(
-              spacing: 5,
-              children: [
-                Expanded(
-                  child: _Trick(
-                    title: 'Current trick',
-                    detail: '♠ Trump',
-                    plays: trick,
-                    names: names,
-                  ),
-                ),
-                if (lastWinner != null)
-                  Expanded(
-                    child: _Trick(
-                      title: 'Last trick',
-                      detail: '${names[lastWinner]} won',
-                      plays: lastTrick,
-                      names: names,
-                    ),
-                  ),
-              ],
-            ),
-      hand: HandSpread(
-        cards: [
-          for (final card in hand)
-            PlayingCard(
-              card,
-              key: ValueKey(card),
-              compact: true,
-              dimmed: playing && seat == turn && !legal.contains(card),
-              onPressed: legal.contains(card)
-                  ? () => session.send('play', {'card': card})
-                  : null,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Trick extends StatelessWidget {
-  const _Trick({
-    required this.title,
-    required this.detail,
-    required this.plays,
-    required this.names,
-  });
-
-  final String title;
-  final String detail;
-  final List<List<dynamic>> plays;
-  final List<String> names;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      spacing: 2,
-      children: [
-        Row(
-          spacing: 4,
-          children: [
-            Expanded(
+          : Align(
+              alignment: plays.isEmpty ? Alignment.center : Alignment.topCenter,
               child: Text(
-                title,
-                style: theme.textTheme.labelMedium?.copyWith(
+                showingLast && lastWinner != null
+                    ? 'Last trick · ${names[lastWinner]} won'
+                    : plays.isEmpty
+                    ? 'Lead a card · ♠ Trump'
+                    : 'Current trick · ♠ Trump',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFFFFD993),
+                  fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
               ),
             ),
-            Flexible(
-              child: Text(
-                detail,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: colors.primary,
-                ),
-              ),
-            ),
-          ],
-        ),
-        if (plays.isEmpty)
-          SizedBox(
-            height: 42,
-            child: Center(
-              child: Text(
-                'Waiting for the lead',
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: colors.onSurfaceVariant,
-                ),
-              ),
-            ),
-          )
-        else
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            spacing: 3,
-            children: [
-              for (final play in plays)
-                Flexible(
-                  child: SizedBox(
-                    width: 46,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      spacing: 2,
-                      children: [
-                        SizedBox(
-                          height: 28,
-                          child: FittedBox(child: PlayingCard(play[1] as int)),
-                        ),
-                        Text(
-                          names[play[0] as int],
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall,
-                        ),
-                      ],
-                    ),
+      hand: hand.isEmpty
+          ? const SizedBox(height: 69)
+          : HandSpread(
+              cards: [
+                for (final card in hand)
+                  PlayingCard(
+                    card,
+                    key: ValueKey(card),
+                    compact: true,
+                    dimmed: playing && seat == turn && !legal.contains(card),
+                    onPressed: legal.contains(card)
+                        ? () => session.send('play', {'card': card})
+                        : null,
                   ),
-                ),
-            ],
-          ),
-      ],
+              ],
+            ),
     );
   }
 }

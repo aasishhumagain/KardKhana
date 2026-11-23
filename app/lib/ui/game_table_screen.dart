@@ -161,7 +161,10 @@ class _GameTableScreenState extends State<GameTableScreen> {
       ? 'You'
       : _playerNames[seat] ?? 'Player ${seat + 1}';
 
-  bool get _immersive => !_showLog && _playing(widget.view);
+  bool get _immersive =>
+      !_showLog &&
+      widget.view['phase'] != 'lobby' &&
+      widget.view['phase'] != 'ended';
 
   @override
   Widget build(BuildContext context) => PopScope<void>(
@@ -170,10 +173,10 @@ class _GameTableScreenState extends State<GameTableScreen> {
       if (!didPop && _showLog) setState(() => _showLog = false);
     },
     child: Scaffold(
-      backgroundColor: _immersive ? const Color(0xFF1B192A) : null,
+      backgroundColor: _immersive ? tableRoom : null,
       appBar: AppBar(
         centerTitle: _immersive,
-        backgroundColor: _immersive ? const Color(0xFF1B192A) : null,
+        backgroundColor: _immersive ? tableRoom : null,
         foregroundColor: _immersive ? const Color(0xFFFFE6C2) : null,
         leadingWidth: 100,
         leading: Padding(

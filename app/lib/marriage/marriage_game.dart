@@ -7,6 +7,8 @@ const _printedJokerStart = standardDeckSize * 3;
 const marriageDeckSize = _printedJokerStart + 3;
 const marriageGroupSize = 3;
 const dubleeSize = 2;
+const visibleDiscardCount = 4;
+typedef MarriageDiscard = ({int card, int? seat, int serial});
 final _runs = [
   [14, 2, 3],
   for (var low = 2; low <= 12; low++) [low, low + 1, low + 2],
@@ -103,7 +105,8 @@ class MarriageGame {
   late List<List<List<int>>> _groups;
   late List<List<int>> _dubleeCards;
   late List<int> _stock;
-  late List<int> _discard;
+  late List<MarriageDiscard> _discard;
+  int _discardSerial = 0;
   late List<String> _notes;
   late List<int> _roundPoints;
   late List<int> _maalPoints;
@@ -120,7 +123,9 @@ class MarriageGame {
   int get round => _round;
   int get turn => _turn;
   int? get winner => _winner;
-  int? get topDiscard => _discard.isEmpty ? null : _discard.last;
+  int? get topDiscard => _discard.isEmpty ? null : _discard.last.card;
+  Iterable<MarriageDiscard> get visibleDiscards =>
+      _discard.skip(max(0, _discard.length - visibleDiscardCount));
   int get stockCount => _stock.length;
   bool get complete => _complete;
   bool get hasDrawn => _hasDrawn;
@@ -156,9 +161,8 @@ class MarriageGame {
         (fromDiscard && !canTakeDiscard(seat))) {
       return false;
     }
-    final pile = fromDiscard ? _discard : _stock;
-    if (pile.isEmpty) return false;
-    final card = pile.removeLast();
+    if (fromDiscard ? _discard.isEmpty : _stock.isEmpty) return false;
+    final card = fromDiscard ? _discard.removeLast().card : _stock.removeLast();
     _hands[seat].add(card);
     _sortHand(_hands[seat]);
     _pickedDiscard = fromDiscard ? card : null;
@@ -246,7 +250,7 @@ class MarriageGame {
   bool discard(int seat, int card) {
     if (!canDiscard(seat, card)) return false;
     _hands[seat].remove(card);
-    _discard.add(card);
+    _discard.add((card: card, seat: seat, serial: ++_discardSerial));
     _notes[seat] = 'Discarded ${marriageCardLabel(card)}';
     _log.add(_round, seat, TableMove.discard, _notes[seat]);
     if (groupCount(seat) == groupsToWin || dubleeCount(seat) == dubleesToWin) {
@@ -358,7 +362,8 @@ class MarriageGame {
     _maal = marriageFace(
       _stock.removeAt(_stock.lastIndexWhere((card) => !isPrintedJoker(card))),
     );
-    _discard = [_stock.removeLast()];
+    _discardSerial = 0;
+    _discard = [(card: _stock.removeLast(), seat: null, serial: 0)];
     _groups = List.generate(playerCount, (_) => []);
     _dubleeCards = List.generate(playerCount, (_) => []);
     _roundPoints = List.filled(playerCount, 0);
