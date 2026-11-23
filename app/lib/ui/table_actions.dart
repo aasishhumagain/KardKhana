@@ -82,22 +82,32 @@ class TableActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
     const padding = EdgeInsets.fromLTRB(10, 3, 10, 4);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colors.surfaceContainerLow,
-        border: Border(top: BorderSide(color: colors.outlineVariant)),
+        color: const Color(0xFF1B192A),
+        border: const Border(top: BorderSide(color: Color(0xFF6B4B3B))),
       ),
       child: scrollHorizontally
-          ? SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: padding,
-              child: Row(spacing: 3, children: actions),
+          ? Center(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: padding,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  spacing: 3,
+                  children: actions,
+                ),
+              ),
             )
           : Padding(
               padding: padding,
-              child: Wrap(spacing: 6, runSpacing: 4, children: actions),
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 6,
+                runSpacing: 4,
+                children: actions,
+              ),
             ),
     );
   }

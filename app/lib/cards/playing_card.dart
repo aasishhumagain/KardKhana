@@ -111,7 +111,7 @@ class PlayingCard extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 140),
           curve: Curves.easeOutCubic,
-          transform: Matrix4.translationValues(0, selected ? -4 : 0, 0),
+          transform: Matrix4.translationValues(0, selected ? -8 : 0, 0),
           decoration: BoxDecoration(
             borderRadius: _corners,
             boxShadow: [

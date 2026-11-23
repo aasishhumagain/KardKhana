@@ -9,6 +9,7 @@ import '../offline/offline_table_widgets.dart';
 import '../offline/offline_turn_pacing.dart';
 import '../ui/game_table_screen.dart';
 import '../ui/table_actions.dart';
+import '../ui/table_scene.dart';
 import '../ui/table_widgets.dart';
 import 'teen_patti_game.dart';
 import 'teen_patti_room.dart';
@@ -125,25 +126,29 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
       view: view,
       onDealFinished: room == null ? _scheduleCpu : null,
       actions: (room?.connected ?? true) ? _tableActions(view, phase) : null,
-      table: ListView(
-        padding: tablePadding,
-        children: [
-          if (room?.notice case final notice?)
-            Text(
-              notice,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+      table: phase == 'playing' && (room?.connected ?? true)
+          ? _match(view, notice: room?.notice)
+          : ListView(
+              padding: tablePadding,
+              children: [
+                if (room?.notice case final notice?)
+                  Text(
+                    notice,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                if (room != null && (!room.connected || phase == 'ended'))
+                  Text(
+                    view['ended'] as String? ??
+                        'Return to the catalog to join a new room.',
+                  )
+                else if (room != null && phase == 'lobby')
+                  LanRoomLobby(room: room, addresses: widget.addresses)
+                else
+                  _match(view),
+              ],
             ),
-          if (room != null && (!room.connected || phase == 'ended'))
-            Text(
-              view['ended'] as String? ??
-                  'Return to the catalog to join a new room.',
-            )
-          else if (room != null && phase == 'lobby')
-            LanRoomLobby(room: room, addresses: widget.addresses)
-          else
-            ..._match(view, phase == 'roundEnd'),
-        ],
-      ),
     );
   }
 
@@ -204,7 +209,8 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
     );
   }
 
-  List<Widget> _match(Map<String, dynamic> view, bool complete) {
+  Widget _match(Map<String, dynamic> view, {String? notice}) {
+    final complete = view['phase'] == 'roundEnd';
     final players = (view['players'] as List).cast<Map<String, dynamic>>();
     final seat = view['seat'] as int;
     final turn = view['turn'] as int;
@@ -226,64 +232,103 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
         ? 'Your turn'
         : '${names[turn]} is playing';
 
-    return [
-      TableStatus(
-        progress: 'Hand ${view['round']} · Pot $pot',
-        status: banner,
-        yourTurn: !complete && turn == seat,
-        complete: complete,
-      ),
-      const SizedBox(height: 5),
-      TableSeats(
-        activeSeat: complete ? null : turn,
-        names: names,
-        status: [
-          for (final player in players)
-            '${player['points']} points · ${player['note']}',
+    final progress = 'Hand ${view['round']}';
+    if (complete) {
+      return Column(
+        spacing: 8,
+        children: [
+          TableStatus(
+            progress: '$progress · Pot $pot',
+            status: banner,
+            yourTurn: false,
+            complete: true,
+          ),
+          TableSeats(
+            names: names,
+            status: [
+              for (final player in players)
+                '${player['points']} points · ${player['note']}',
+            ],
+          ),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              if (ownHand.isNotEmpty)
+                _shownHand('Your hand', ownHand, compact: true),
+              for (var i = 0; i < players.length; i++)
+                if (i != seat && (players[i]['reveal'] as List).isNotEmpty)
+                  _shownHand(
+                    names[i],
+                    (players[i]['reveal'] as List).cast<int>(),
+                    compact: true,
+                  ),
+            ],
+          ),
+        ],
+      );
+    }
+
+    return TableScene(
+      seats: [
+        for (var i = 0; i < players.length; i++)
+          (
+            name: names[i],
+            detail: '${players[i]['points']} pts · ${players[i]['note']}',
+          ),
+      ],
+      localSeat: seat,
+      activeSeat: turn,
+      status: banner,
+      progress: progress,
+      notice: notice,
+      center: Column(
+        mainAxisSize: MainAxisSize.min,
+        spacing: 2,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            spacing: 5,
+            children: [
+              const Icon(
+                Icons.toll_rounded,
+                color: Color(0xFFF3CC7F),
+                size: 22,
+              ),
+              Text(
+                'Pot $pot',
+                style: const TextStyle(
+                  color: Color(0xFFFFE0A5),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          if (ownHand.isNotEmpty)
+            Text(
+              'Your hand · ${rankTeenPattiHand(ownHand).kind.label}',
+              textAlign: TextAlign.center,
+            )
+          else if (players[seat]['note'] != 'Out of points')
+            const Text(
+              'Tap Look to see your cards',
+              textAlign: TextAlign.center,
+            ),
         ],
       ),
-      const SizedBox(height: 8),
-      if (complete)
-        Wrap(
-          alignment: WrapAlignment.center,
-          spacing: 8,
-          runSpacing: 6,
-          children: [
-            if (ownHand.isNotEmpty)
-              _shownHand('Your hand', ownHand, compact: true),
-            for (var i = 0; i < players.length; i++)
-              if (i != seat && (players[i]['reveal'] as List).isNotEmpty)
-                _shownHand(
-                  names[i],
-                  (players[i]['reveal'] as List).cast<int>(),
-                  compact: true,
-                ),
-          ],
-        )
-      else if (ownHand.isNotEmpty)
-        Center(child: _shownHand('Your hand', ownHand))
-      else if (!complete && players[seat]['note'] != 'Out of points')
-        const Center(
-          child: CardTray(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              spacing: 5,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  spacing: 6,
-                  children: [
-                    PlayingCard.faceDown(),
-                    PlayingCard.faceDown(),
-                    PlayingCard.faceDown(),
-                  ],
-                ),
-                Text('Blind · Tap Look to see your cards'),
-              ],
-            ),
-          ),
-        ),
-    ];
+      hand: HandSpread(
+        large: true,
+        cards: [
+          if (ownHand.isNotEmpty)
+            for (final card in ownHand)
+              PlayingCard(card, key: ValueKey(card), portrait: true)
+          else if (players[seat]['note'] != 'Out of points')
+            for (var index = 0; index < 3; index++)
+              PlayingCard.faceDown(key: ValueKey(index)),
+        ],
+      ),
+    );
   }
 }
 

@@ -5,7 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../cards/playing_card.dart';
 import '../settings/game_feedback.dart';
-import 'table_widgets.dart';
+import 'table_scene.dart';
 
 class DealAnimation extends StatefulWidget {
   const DealAnimation({
@@ -90,98 +90,85 @@ class _DealAnimationState extends State<DealAnimation>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return ColoredBox(
-      color: theme.scaffoldBackgroundColor,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: tableFelt,
-            border: Border.all(color: const Color(0xFF60796F)),
-          ),
-          child: LayoutBuilder(
-            builder: (context, limits) {
-              final center = Offset(limits.maxWidth / 2, limits.maxHeight / 2);
-              final targets = List.generate(widget.seats.length, (index) {
-                final angle =
-                    math.pi / 2 + 2 * math.pi * index / widget.seats.length;
-                return center +
-                    Offset(
-                      math.cos(angle) * limits.maxWidth * .38,
-                      math.sin(angle) * limits.maxHeight * .29,
-                    );
-              });
-              return AnimatedBuilder(
-                animation: _motion,
-                builder: (context, _) {
-                  final elapsed = _motion.value * _durationMs;
-                  final shuffling = elapsed < _shuffleMs;
-                  final riffle = math.sin(math.pi * elapsed / _shuffleMs);
-                  final status = shuffling
-                      ? 'Shuffling cards'
-                      : 'Dealing cards';
-                  return Stack(
-                    children: [
-                      Positioned(
-                        top: 10,
-                        left: 0,
-                        right: 0,
-                        child: Semantics(
-                          liveRegion: true,
-                          child: Text(
-                            status,
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              color: Colors.white,
-                            ),
-                          ),
+    return TableScenery(
+      child: LayoutBuilder(
+        builder: (context, limits) {
+          final center = Offset(limits.maxWidth / 2, limits.maxHeight / 2);
+          final targets = List.generate(widget.seats.length, (index) {
+            final angle =
+                math.pi / 2 + 2 * math.pi * index / widget.seats.length;
+            return center +
+                Offset(
+                  math.cos(angle) * limits.maxWidth * .38,
+                  math.sin(angle) * limits.maxHeight * .29,
+                );
+          });
+          return AnimatedBuilder(
+            animation: _motion,
+            builder: (context, _) {
+              final elapsed = _motion.value * _durationMs;
+              final shuffling = elapsed < _shuffleMs;
+              final riffle = math.sin(math.pi * elapsed / _shuffleMs);
+              final status = shuffling ? 'Shuffling cards' : 'Dealing cards';
+              return Stack(
+                children: [
+                  Positioned(
+                    top: 10,
+                    left: 0,
+                    right: 0,
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        status,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: Colors.white,
                         ),
                       ),
-                      for (var index = 0; index < targets.length; index++)
-                        Positioned(
-                          left: targets[index].dx - 54,
-                          top: targets[index].dy + 18,
-                          width: 108,
-                          child: Text(
-                            widget.seats[index],
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: const Color(0xFFF0DAC0),
-                            ),
-                          ),
+                    ),
+                  ),
+                  for (var index = 0; index < targets.length; index++)
+                    Positioned(
+                      left: targets[index].dx - 54,
+                      top: targets[index].dy + 18,
+                      width: 108,
+                      child: Text(
+                        widget.seats[index],
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: const Color(0xFFF0DAC0),
                         ),
-                      if (shuffling) ...[
-                        _card(
-                          center + Offset(-8 - 18 * riffle, 0),
-                          .88,
-                          -.14 - .23 * riffle,
+                      ),
+                    ),
+                  if (shuffling) ...[
+                    _card(
+                      center + Offset(-8 - 18 * riffle, 0),
+                      .88,
+                      -.14 - .23 * riffle,
+                    ),
+                    _card(
+                      center + Offset(8 + 18 * riffle, -3 * riffle),
+                      .88,
+                      .14 + .23 * riffle,
+                    ),
+                  ] else ...[
+                    _card(center + const Offset(-2, 3), .85, -.08),
+                    _card(center, .85, .05),
+                    for (var index = 0; index < targets.length; index++)
+                      if (elapsed >= _shuffleMs + index * _staggerMs)
+                        _dealCard(
+                          center,
+                          targets[index],
+                          elapsed - _shuffleMs - index * _staggerMs,
                         ),
-                        _card(
-                          center + Offset(8 + 18 * riffle, -3 * riffle),
-                          .88,
-                          .14 + .23 * riffle,
-                        ),
-                      ] else ...[
-                        _card(center + const Offset(-2, 3), .85, -.08),
-                        _card(center, .85, .05),
-                        for (var index = 0; index < targets.length; index++)
-                          if (elapsed >= _shuffleMs + index * _staggerMs)
-                            _dealCard(
-                              center,
-                              targets[index],
-                              elapsed - _shuffleMs - index * _staggerMs,
-                            ),
-                      ],
-                    ],
-                  );
-                },
+                  ],
+                ],
               );
             },
-          ),
-        ),
+          );
+        },
       ),
     );
   }

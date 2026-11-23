@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kardkhana/cards/playing_card.dart';
 import 'package:kardkhana/kardkhana_app.dart';
 import 'package:kardkhana/ui/table_actions.dart';
-import 'package:kardkhana/ui/table_widgets.dart';
+import 'package:kardkhana/ui/table_scene.dart';
 import 'package:material_ui/material_ui.dart';
 
 void main() {
@@ -165,7 +165,11 @@ void main() {
     expect(find.textContaining('Draw stock').hitTestable(), findsNothing);
     final actions = find.byType(TableActionBar).hitTestable();
     final actionsTop = tester.getTopLeft(actions).dy;
-    final card = find.byType(PlayingCard).hitTestable().first;
+    final cards = find.descendant(
+      of: find.byType(HandSpread),
+      matching: find.byType(PlayingCard),
+    );
+    final card = cards.hitTestable().first;
     final face = find.descendant(of: card, matching: find.byType(InkWell));
     final cardTop = tester.getTopLeft(face).dy;
     expect(
@@ -175,11 +179,11 @@ void main() {
     await tap(card);
     expect(tester.widget<PlayingCard>(card).selected, isTrue);
     expect(tester.getTopLeft(face).dy, lessThan(cardTop));
-    final tray = find.byType(CardTray).hitTestable();
-    final trayTop = tester.getTopLeft(tray).dy;
-    await tester.drag(tray, const Offset(0, -64));
+    final spread = find.byType(HandSpread).hitTestable();
+    final spreadTop = tester.getTopLeft(spread).dy;
+    await tester.drag(spread, const Offset(0, -64));
     await tester.pumpAndSettle();
-    expect(tester.getTopLeft(tray).dy, lessThan(trayTop));
+    expect(tester.getTopLeft(spread).dy, lessThan(spreadTop));
     expect(tester.getTopLeft(actions).dy, actionsTop);
     await tester.tap(find.text('Discard selected').hitTestable());
     await tester.pump();
@@ -228,7 +232,15 @@ void main() {
       await tester.tap(target.hitTestable());
       await tester.pumpAndSettle();
     }
-    expect(find.byType(PlayingCard).hitTestable(), findsNWidgets(22));
+    expect(
+      find
+          .descendant(
+            of: find.byType(HandSpread),
+            matching: find.byType(PlayingCard),
+          )
+          .hitTestable(),
+      findsNWidgets(22),
+    );
     expect(find.text('CPU 4').hitTestable(), findsOneWidget);
     expect(find.text('Discard selected').hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);

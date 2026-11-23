@@ -10,6 +10,7 @@ import '../offline/offline_table_widgets.dart';
 import '../offline/offline_turn_pacing.dart';
 import '../ui/game_table_screen.dart';
 import '../ui/table_actions.dart';
+import '../ui/table_scene.dart';
 import '../ui/table_widgets.dart';
 import 'marriage_game.dart';
 import 'marriage_room.dart';
@@ -185,39 +186,40 @@ class _MarriagePageState extends State<MarriagePage> {
               ],
             )
           : null,
-      table: ListView(
-        padding: tablePadding,
-        children: [
-          if (room?.notice case final notice?)
-            Text(
-              notice,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+      table: phase == 'playing' && connected
+          ? _match(view, notice: room?.notice)
+          : ListView(
+              padding: tablePadding,
+              children: [
+                if (room?.notice case final notice?)
+                  Text(
+                    notice,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                if (room != null && (!room.connected || phase == 'ended'))
+                  Text(
+                    view['ended'] as String? ??
+                        'Return to the catalog to join a new room.',
+                  )
+                else if (room != null && phase == 'lobby')
+                  LanRoomLobby(room: room, addresses: widget.addresses)
+                else
+                  _match(view),
+              ],
             ),
-          if (room != null && (!room.connected || phase == 'ended'))
-            Text(
-              view['ended'] as String? ??
-                  'Return to the catalog to join a new room.',
-            )
-          else if (room != null && phase == 'lobby')
-            LanRoomLobby(room: room, addresses: widget.addresses)
-          else
-            ..._match(view, complete: phase == 'roundEnd'),
-        ],
-      ),
     );
   }
 
   Widget _turnActions(Map<String, dynamic> view) {
     final yourTurn = view['turn'] == view['seat'];
     final afterDraw = yourTurn && view['hasDrawn'] == true;
-    final stock = view['stockCount'] as int;
-    final discard = view['topDiscard'] as int?;
     final maal = view['maal'] as int?;
     final player = (view['players'] as List)[view['seat'] as int] as Map;
     final dublees = player['dublees'] as int? ?? 0;
     final groups = player['groups'] as int;
     final available = view['availableDublees'] as int?;
-    final canTakeDiscard = view['canTakeDiscard'] as bool? ?? discard != null;
     final picked = _selected.length == 1 ? _selected.single : null;
     final discardable = view['discardable'] as List;
 
@@ -234,26 +236,7 @@ class _MarriagePageState extends State<MarriagePage> {
                     'card': picked,
                   }, () => _game.discard(0, picked))
                 : null,
-          )
-        else ...[
-          TableAction(
-            label: 'Draw stock · $stock',
-            icon: Icons.layers_outlined,
-            tone: TableActionTone.primary,
-            onPressed: yourTurn && stock > 0
-                ? () => _draw(fromDiscard: false)
-                : null,
           ),
-          TableAction(
-            label: discard == null
-                ? 'Discard pile empty'
-                : 'Take ${marriageCardLabel(discard)}',
-            icon: Icons.download_rounded,
-            onPressed: yourTurn && canTakeDiscard
-                ? () => _draw(fromDiscard: true)
-                : null,
-          ),
-        ],
         if (dublees == 0) ...[
           TableAction(
             label: 'Lay group',
@@ -288,7 +271,8 @@ class _MarriagePageState extends State<MarriagePage> {
     );
   }
 
-  List<Widget> _match(Map<String, dynamic> view, {required bool complete}) {
+  Widget _match(Map<String, dynamic> view, {String? notice}) {
+    final complete = view['phase'] == 'roundEnd';
     final players = (view['players'] as List).cast<Map<String, dynamic>>();
     final seat = view['seat'] as int;
     final turn = view['turn'] as int;
@@ -300,11 +284,7 @@ class _MarriagePageState extends State<MarriagePage> {
     final hasDrawn = view['hasDrawn'] as bool;
     final dublees = players[seat]['dublees'] as int? ?? 0;
     final maal = view['maal'] as int?;
-    final progress = [
-      'Hand ${view['round']}',
-      if (dublees > 0) '$dublees/${MarriageGame.dubleesToWin} Dublees',
-      if (maal != null && !complete) 'Maal ${cardLabel(maal)}',
-    ].join(' · ');
+    final progress = 'Hand ${view['round']}';
     final winner = view['winner'] as int?;
     final hand = (view['hand'] as List).cast<int>();
     final status = complete
@@ -325,78 +305,172 @@ class _MarriagePageState extends State<MarriagePage> {
               : 'Lay a group or draw a card'
         : '${names[turn]} is playing';
 
-    return [
-      TableStatus(
-        progress: progress,
-        status: status,
-        yourTurn: yourTurn,
-        complete: complete,
-      ),
-      const SizedBox(height: 4),
-      TableSeats(
-        activeSeat: complete ? null : turn,
-        statusLines: complete ? 3 : 1,
-        names: names,
-        status: [
-          for (final player in players)
-            complete
-                ? '${player['roundPoints']} this hand · ${player['points']} total · ${player['maalPoints'] ?? 0} maal'
-                : (player['dublees'] as int? ?? 0) > 0
-                ? '${player['dublees']}/${MarriageGame.dubleesToWin} Dublees'
-                : '${player['groups']}/${MarriageGame.groupsToWin} groups',
+    if (complete) {
+      return Column(
+        spacing: 8,
+        children: [
+          TableStatus(
+            progress: progress,
+            status: status,
+            yourTurn: false,
+            complete: true,
+          ),
+          TableSeats(
+            statusLines: 3,
+            names: names,
+            status: [
+              for (final player in players)
+                '${player['roundPoints']} this hand · ${player['points']} total · ${player['maalPoints'] ?? 0} maal',
+            ],
+          ),
         ],
-      ),
-      if (!complete) ...[
-        const SizedBox(height: 4),
-        if (_message case final message?) ...[
-          Builder(
-            builder: (context) => Text(
-              message,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+      );
+    }
+
+    final stock = view['stockCount'] as int;
+    final discard = view['topDiscard'] as int?;
+    final canDraw = yourTurn && !hasDrawn;
+    final canTake =
+        canDraw && (view['canTakeDiscard'] as bool? ?? discard != null);
+    return TableScene(
+      seats: [
+        for (var i = 0; i < players.length; i++)
+          (
+            name: names[i],
+            detail: [
+              if ((players[i]['dublees'] as int? ?? 0) > 0)
+                '${players[i]['dublees']}/${MarriageGame.dubleesToWin} Dublees'
+              else
+                '${players[i]['groups']}/${MarriageGame.groupsToWin} groups',
+              if (i == seat && maal != null) 'Maal ${cardLabel(maal)}',
+            ].join(' · '),
+          ),
+      ],
+      localSeat: seat,
+      activeSeat: turn,
+      progress: progress,
+      status: status,
+      notice: notice ?? _message,
+      center: Row(
+        spacing: 10,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Flexible(
+            child: _Pile(
+              label: canDraw && stock > 0
+                  ? 'Draw stock · $stock'
+                  : 'Stock · $stock',
+              card: stock > 0 ? const PlayingCard.faceDown() : null,
+              stacked: true,
+              onTap: canDraw && stock > 0
+                  ? () => _draw(fromDiscard: false)
+                  : null,
             ),
           ),
-          const SizedBox(height: 4),
-        ],
-        CardTray(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 4,
-                runSpacing: 6,
-                children: [
-                  for (final card in hand)
-                    PlayingCard(
-                      isPrintedJoker(card) ? null : marriageFace(card),
-                      key: ValueKey(card),
+          Flexible(
+            child: _Pile(
+              label: canTake && discard != null
+                  ? 'Take ${marriageCardLabel(discard)}'
+                  : 'Discard pile',
+              card: discard == null
+                  ? null
+                  : PlayingCard(
+                      isPrintedJoker(discard) ? null : marriageFace(discard),
                       compact: true,
-                      wild: maal != null && isMarriageWild(card, maal),
-                      selected: _selected.contains(card),
-                      onPressed: yourTurn
-                          ? () => _toggleCard(
-                              card,
-                              dublees == MarriageGame.dubleesToReveal
-                                  ? dubleeSize
-                                  : marriageGroupSize,
-                            )
-                          : null,
                     ),
-                ],
+              onTap: canTake ? () => _draw(fromDiscard: true) : null,
+            ),
+          ),
+        ],
+      ),
+      hand: HandSpread(
+        cards: [
+          for (final card in hand)
+            PlayingCard(
+              isPrintedJoker(card) ? null : marriageFace(card),
+              key: ValueKey(card),
+              compact: true,
+              wild: maal != null && isMarriageWild(card, maal),
+              selected: _selected.contains(card),
+              onPressed: yourTurn
+                  ? () => _toggleCard(
+                      card,
+                      dublees == MarriageGame.dubleesToReveal
+                          ? dubleeSize
+                          : marriageGroupSize,
+                    )
+                  : null,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Pile extends StatelessWidget {
+  const _Pile({
+    required this.label,
+    required this.card,
+    required this.onTap,
+    this.stacked = false,
+  });
+
+  final String label;
+  final Widget? card;
+  final VoidCallback? onTap;
+  final bool stacked;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    type: MaterialType.transparency,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(7),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          spacing: 2,
+          children: [
+            Flexible(
+              child: SizedBox(
+                height: 40,
+                width: 34,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (stacked && card != null)
+                      Transform.translate(
+                        offset: const Offset(-2, 2),
+                        child: const FittedBox(child: PlayingCard.faceDown()),
+                      ),
+                    if (card case final face?)
+                      FittedBox(child: face)
+                    else
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(color: const Color(0x889FBEAB)),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: onTap == null
+                    ? const Color(0xFFD3E7D8)
+                    : const Color(0xFFFFDA96),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 5),
-        Text(
-          maal == null
-              ? 'Reveal the maal with three pure groups or seven Dublees.'
-              : dublees > 0
-              ? 'Dublees need two identical cards.'
-              : 'Wild cards may complete runs and trials.',
-          textAlign: TextAlign.center,
-        ),
-      ],
-    ];
-  }
+      ),
+    ),
+  );
 }

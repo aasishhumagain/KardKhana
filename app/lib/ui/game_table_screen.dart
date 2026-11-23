@@ -161,6 +161,8 @@ class _GameTableScreenState extends State<GameTableScreen> {
       ? 'You'
       : _playerNames[seat] ?? 'Player ${seat + 1}';
 
+  bool get _immersive => !_showLog && _playing(widget.view);
+
   @override
   Widget build(BuildContext context) => PopScope<void>(
     canPop: !_showLog,
@@ -168,7 +170,11 @@ class _GameTableScreenState extends State<GameTableScreen> {
       if (!didPop && _showLog) setState(() => _showLog = false);
     },
     child: Scaffold(
+      backgroundColor: _immersive ? const Color(0xFF1B192A) : null,
       appBar: AppBar(
+        centerTitle: _immersive,
+        backgroundColor: _immersive ? const Color(0xFF1B192A) : null,
+        foregroundColor: _immersive ? const Color(0xFFFFE6C2) : null,
         leadingWidth: 100,
         leading: Padding(
           padding: const EdgeInsets.only(left: 4),
@@ -177,11 +183,13 @@ class _GameTableScreenState extends State<GameTableScreen> {
               IconButton(
                 tooltip: 'Home',
                 icon: const Icon(Icons.home_outlined),
+                color: _immersive ? const Color(0xFFFFE6C2) : null,
                 onPressed: () =>
                     Navigator.of(context).popUntil((route) => route.isFirst),
               ),
               IconButton(
                 tooltip: _showLog ? 'Back to game' : 'Log',
+                color: _immersive ? const Color(0xFFFFE6C2) : null,
                 isSelected: _showLog,
                 icon: const Icon(Icons.receipt_long_outlined),
                 selectedIcon: const Icon(Icons.receipt_long_rounded),
@@ -194,6 +202,13 @@ class _GameTableScreenState extends State<GameTableScreen> {
         title: Text(
           _showLog ? 'Game log' : widget.title,
           overflow: TextOverflow.ellipsis,
+          style: _immersive
+              ? const TextStyle(
+                  color: Color(0xFFFFE6C2),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: .2,
+                )
+              : null,
         ),
       ),
       body: SafeArea(
