@@ -49,6 +49,12 @@ LanGame<MarriageGame> _rules([Random? random]) => LanGame<MarriageGame>(
               cards.length == marriageGroupSize &&
               cards.every(_validCard) =>
         game.layGroup(seat, cards.cast<int>()),
+      'showDublees' => game.showDublees(seat),
+      'layDublee'
+          when cards is List &&
+              cards.length == dubleeSize &&
+              cards.every(_validCard) =>
+        game.layDublee(seat, cards.first as int, cards.last as int),
       'discard' when card is int && _validCard(card) => game.discard(
         seat,
         card,
@@ -82,8 +88,10 @@ Map<String, dynamic> marriageTableView(
         'name': seats[seat].name,
         'ready': seats[seat].ready,
         'groups': game?.groupCount(seat) ?? 0,
+        'dublees': game?.dubleeCount(seat) ?? 0,
         'points': game?.pointsFor(seat) ?? 0,
         'roundPoints': game?.roundPointsFor(seat) ?? 0,
+        'maalPoints': game?.maalPointsFor(seat) ?? 0,
         'note': game?.noteFor(seat) ?? '',
       },
   ],
@@ -102,6 +110,8 @@ Map<String, dynamic> marriageSeatView(MarriageGame? game, int seat) {
     'seat': seat,
     'hand': hand,
     'maal': game?.maalFor(seat),
+    'availableDublees': game?.availableDublees(seat) ?? 0,
+    'canTakeDiscard': game?.canTakeDiscard(seat) ?? false,
     'discardable': game == null
         ? const <int>[]
         : hand.where((card) => game.canDiscard(seat, card)).toList(),
@@ -114,6 +124,7 @@ bool _validView(Map<String, dynamic> view) {
   final hand = view['hand'];
   final discardable = view['discardable'];
   final maal = view['maal'];
+  final availableDublees = view['availableDublees'];
   bool validSeat(Object? seat) =>
       seat is int && seat >= 0 && seat < players.length;
   return (phase == 'lobby' ||
@@ -126,6 +137,11 @@ bool _validView(Map<String, dynamic> view) {
       view['hasDrawn'] is bool &&
       (view['topDiscard'] == null || _validCard(view['topDiscard'])) &&
       (maal == null || (maal is int && maal >= 0 && maal < standardDeckSize)) &&
+      (availableDublees == null ||
+          (availableDublees is int &&
+              availableDublees >= 0 &&
+              availableDublees <= MarriageGame.handSize ~/ dubleeSize + 1)) &&
+      (view['canTakeDiscard'] == null || view['canTakeDiscard'] is bool) &&
       hand is List &&
       hand.length <= MarriageGame.handSize + 1 &&
       hand.every(_validCard) &&
@@ -135,8 +151,13 @@ bool _validView(Map<String, dynamic> view) {
       players.every(
         (player) =>
             player['groups'] is int &&
+            (player['dublees'] == null ||
+                player['dublees'] == 0 ||
+                player['dublees'] == MarriageGame.dubleesToReveal ||
+                player['dublees'] == MarriageGame.dubleesToWin) &&
             player['points'] is int &&
             player['roundPoints'] is int &&
+            (player['maalPoints'] == null || player['maalPoints'] is int) &&
             player['note'] is String,
       );
 }

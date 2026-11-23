@@ -94,8 +94,6 @@ void main() {
         await tester.tap(find.widgetWithText(ChoiceChip, '5 players'));
         await tester.tap(find.widgetWithText(FilledButton, 'Start game'));
         await tester.pumpAndSettle();
-        expect(find.text('CPU 4'), findsOneWidget);
-        expect(find.text('CPU 5'), findsNothing);
         if (game.key == 'Teen Patti') {
           await tester.tap(find.text('Look').hitTestable());
           await tester.pumpAndSettle();
@@ -108,6 +106,12 @@ void main() {
             findsOneWidget,
           );
         }
+        final fourthCpu = find.text('CPU 4');
+        if (game.key == 'Marriage') {
+          await tester.scrollUntilVisible(fourthCpu, 60);
+        }
+        expect(fourthCpu.hitTestable(), findsOneWidget);
+        expect(find.text('CPU 5'), findsNothing);
       }
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();

@@ -112,11 +112,31 @@ class _MarriagePageState extends State<MarriagePage> {
     _submit('lay', {'cards': cards}, () => _game.layGroup(0, cards));
   }
 
-  void _toggleCard(int card) {
+  void _layDublee() {
+    final cards = _selected.toList();
+    if (!isMarriageDublee(cards.first, cards.last)) {
+      setState(
+        () => _message = 'A Dublee needs two cards of the same rank and suit.',
+      );
+      return;
+    }
+    _submit('layDublee', {'cards': cards}, () {
+      final accepted = _game.layDublee(0, cards.first, cards.last);
+      if (!accepted) {
+        setState(
+          () =>
+              _message = 'Finish with the card you took from the discard pile.',
+        );
+      }
+      return accepted;
+    });
+  }
+
+  void _toggleCard(int card, int limit) {
     setState(() {
       _message = null;
       if (_selected.remove(card)) return;
-      if (_selected.length == marriageGroupSize) {
+      if (_selected.length == limit) {
         _message = 'Deselect a card before choosing another.';
       } else {
         _selected.add(card);
@@ -179,6 +199,11 @@ class _MarriagePageState extends State<MarriagePage> {
     final stock = view['stockCount'] as int;
     final discard = view['topDiscard'] as int?;
     final maal = view['maal'] as int?;
+    final player = (view['players'] as List)[view['seat'] as int] as Map;
+    final dublees = player['dublees'] as int? ?? 0;
+    final groups = player['groups'] as int;
+    final available = view['availableDublees'] as int?;
+    final canTakeDiscard = view['canTakeDiscard'] as bool? ?? discard != null;
     final picked = _selected.length == 1 ? _selected.single : null;
     final discardable = view['discardable'] as List;
 
@@ -209,18 +234,41 @@ class _MarriagePageState extends State<MarriagePage> {
                 ? 'Discard pile empty'
                 : 'Take ${marriageCardLabel(discard)}',
             icon: Icons.download_rounded,
-            onPressed: yourTurn && discard != null
+            onPressed: yourTurn && canTakeDiscard
                 ? () => _draw(fromDiscard: true)
                 : null,
           ),
         ],
-        TableAction(
-          label: 'Lay group',
-          icon: Icons.grid_view_rounded,
-          onPressed: yourTurn && _selected.length == marriageGroupSize
-              ? () => _layGroup(maal)
-              : null,
-        ),
+        if (dublees == 0) ...[
+          TableAction(
+            label: 'Lay group',
+            icon: Icons.grid_view_rounded,
+            onPressed: yourTurn && _selected.length == marriageGroupSize
+                ? () => _layGroup(maal)
+                : null,
+          ),
+          if (groups == 0 && available != null)
+            TableAction(
+              label: available >= MarriageGame.dubleesToReveal
+                  ? 'Show 7 Dublees'
+                  : 'Dublees $available/${MarriageGame.dubleesToReveal}',
+              icon: Icons.copy_outlined,
+              onPressed: yourTurn && available >= MarriageGame.dubleesToReveal
+                  ? () => _submit(
+                      'showDublees',
+                      const {},
+                      () => _game.showDublees(0),
+                    )
+                  : null,
+            ),
+        ] else if (dublees == MarriageGame.dubleesToReveal)
+          TableAction(
+            label: 'Lay eighth Dublee',
+            icon: Icons.copy_outlined,
+            onPressed: afterDraw && _selected.length == dubleeSize
+                ? _layDublee
+                : null,
+          ),
       ],
     );
   }
@@ -240,6 +288,10 @@ class _MarriagePageState extends State<MarriagePage> {
     ];
     final yourTurn = !complete && turn == seat;
     final hasDrawn = view['hasDrawn'] as bool;
+    final dublees = players[seat]['dublees'] as int? ?? 0;
+    final progress = dublees == 0
+        ? 'Hand ${view['round']}'
+        : 'Hand ${view['round']} · $dublees/${MarriageGame.dubleesToWin} Dublees';
     final maal = view['maal'] as int?;
     final winner = view['winner'] as int?;
     final hand = (view['hand'] as List).cast<int>();
@@ -247,17 +299,23 @@ class _MarriagePageState extends State<MarriagePage> {
         ? winner == null
               ? 'Stock exhausted · Draw'
               : winner == seat
-              ? 'You win the hand'
-              : '${names[winner]} wins the hand'
+              ? 'You finish the hand'
+              : '${names[winner]} finishes the hand'
         : yourTurn
-        ? hasDrawn
+        ? dublees == MarriageGame.dubleesToWin
+              ? 'Discard one card to finish'
+              : dublees > 0
+              ? hasDrawn
+                    ? 'Lay your eighth Dublee or discard'
+                    : 'Draw to make your eighth Dublee'
+              : hasDrawn
               ? 'Lay a group or discard one card'
               : 'Lay a group or draw a card'
         : '${names[turn]} is playing';
 
     return [
       TableStatus(
-        progress: 'Hand ${view['round']}',
+        progress: progress,
         status: status,
         yourTurn: yourTurn,
         complete: complete,
@@ -279,7 +337,14 @@ class _MarriagePageState extends State<MarriagePage> {
                   key: ValueKey(card),
                   wild: maal != null && isMarriageWild(card, maal),
                   selected: _selected.contains(card),
-                  onPressed: yourTurn ? () => _toggleCard(card) : null,
+                  onPressed: yourTurn
+                      ? () => _toggleCard(
+                          card,
+                          dublees == MarriageGame.dubleesToReveal
+                              ? dubleeSize
+                              : marriageGroupSize,
+                        )
+                      : null,
                 ),
             ],
           ),
@@ -287,7 +352,9 @@ class _MarriagePageState extends State<MarriagePage> {
         const SizedBox(height: 8),
         Text(
           maal == null
-              ? 'Lay three pure runs or tunnellas to reveal the maal.'
+              ? 'Reveal the maal with three pure groups or seven Dublees.'
+              : dublees > 0
+              ? 'Maal · ${cardLabel(maal)}   Dublees need two identical cards.'
               : 'Maal · ${cardLabel(maal)}   Wild cards may complete runs and trials.',
         ),
         const SizedBox(height: 8),
@@ -298,7 +365,9 @@ class _MarriagePageState extends State<MarriagePage> {
         status: [
           for (final player in players)
             complete
-                ? '${player['roundPoints']} this hand · ${player['points']} total'
+                ? '${player['roundPoints']} this hand · ${player['points']} total · ${player['maalPoints'] ?? 0} maal'
+                : (player['dublees'] as int? ?? 0) > 0
+                ? '${player['dublees']}/${MarriageGame.dubleesToWin} Dublees · ${player['note']}'
                 : '${player['groups']}/${MarriageGame.groupsToWin} groups · ${player['note']}',
         ],
       ),

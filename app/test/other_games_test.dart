@@ -103,6 +103,7 @@ void main() {
     expect(isMarriageGroup([0, 2, 156]), false);
     expect(isMarriageGroup([0, 2, 156], maal: 51), true);
     expect(isMarriageGroup([0, 52, 156], maal: 51), false);
+    expect(isMarriageGroup([156, 157, 158], maal: 51), true);
   });
 
   test('Marriage counts ace and two as same-suit maal neighbors', () {
@@ -126,6 +127,7 @@ void main() {
       final game = MarriageGame(5, random: _DealHand(hand));
       expect(game.handFor(0), unorderedEquals(hand));
       expect(game.maalFor(0), isNull);
+      expect(game.showDublees(0), false);
       expect(game.draw(1, fromDiscard: false), false);
       expect(game.layGroup(0, [0, 0, 1]), false);
       for (var index = 0; index < hand.length; index += 3) {
@@ -135,8 +137,88 @@ void main() {
       expect(game.maalFor(0), isNotNull);
       expect(game.maalFor(1), isNull);
       expect(game.winner, 0);
-      expect(game.roundPointsFor(0), 40);
-      expect(game.roundPointsFor(1), -10);
+      expect(game.maalPointsFor(0), 2);
+      expect(game.roundPointsFor(0), 48);
+      expect(game.roundPointsFor(1), -12);
+    },
+  );
+
+  test('Marriage Dublee uses exact pairs and commits to the eighth pair', () {
+    expect(isMarriageDublee(0, 52), true);
+    expect(isMarriageDublee(0, 0), false);
+    expect(isMarriageDublee(0, 13), false);
+    expect(isMarriageDublee(156, 157), false);
+    final game = MarriageGame(
+      2,
+      random: _DealHand(_dubleeHand, stockTop: [74, 62]),
+    );
+    expect(game.availableDublees(0), 8);
+    expect(game.showDublees(1), false);
+    expect(game.showDublees(0), true);
+    expect(game.showDublees(0), false);
+    expect(game.dubleeCount(0), 7);
+    expect(game.maalFor(0), 22);
+    expect(game.maalFor(1), isNull);
+    expect(game.handFor(0), hasLength(7));
+    expect(game.layGroup(0, [21, 22, 23]), false);
+    expect(game.layDublee(0, 20, 72), false);
+    expect(game.canTakeDiscard(0), true);
+    expect(game.draw(0, fromDiscard: true), true);
+    expect(game.layDublee(0, 20, 72), false);
+    expect(game.discard(0, 30), false);
+    expect(game.layDublee(0, 10, 62), true);
+    expect(game.complete, false);
+    expect(game.discard(0, 30), true);
+    expect(game.winner, 0);
+    expect(game.maalPointsFor(0), 10);
+    expect(game.roundPointsFor(0), 25);
+    expect(game.roundPointsFor(1), -25);
+    expect(game.logView.last.last, 'Won with eight Dublees');
+    expect(game.nextRound(), true);
+    expect(game.dubleeCount(0), 0);
+    expect(game.maalFor(0), isNull);
+    expect(game.pointsFor(0), 25);
+  });
+
+  test('Marriage CPU reveals Dublees and finishes by drawing stock', () {
+    final game = MarriageGame(
+      2,
+      random: _DealHand(_dubleeHand, seat: 1, stockTop: [74, 51, 50, 62]),
+    );
+    expect(game.draw(0, fromDiscard: false), true);
+    expect(game.discard(0, 50), true);
+    game.playCpuTurn();
+    expect(game.winner, 1);
+    expect(game.dubleeCount(1), 8);
+    expect(
+      game.logView.where((entry) => entry[1] == 1).map((entry) => entry.last),
+      contains('Drew a card from stock'),
+    );
+  });
+
+  test(
+    'Marriage sequence player cannot pick up a wild discard after seeing',
+    () {
+      final game = MarriageGame(
+        2,
+        random: _DealHand(_marriageWinningHand, stockTop: [74, 75]),
+      );
+      expect(game.canTakeDiscard(0), true);
+      for (var group = 0; group < MarriageGame.groupsToReveal; group++) {
+        final start = group * marriageGroupSize;
+        expect(
+          game.layGroup(
+            0,
+            _marriageWinningHand.sublist(start, start + marriageGroupSize),
+          ),
+          true,
+        );
+      }
+      expect(game.maalFor(0), 22);
+      expect(game.canTakeDiscard(0), false);
+      expect(game.draw(0, fromDiscard: true), false);
+      expect(game.topDiscard, 75);
+      expect(game.draw(0, fromDiscard: false), true);
     },
   );
 
@@ -331,11 +413,11 @@ void main() {
       expect(room.view['winner'], 0);
       expect(room.view['log'], host.view['log']);
       expect(_marriagePlayers(room).map((p) => p['roundPoints']), [
-        40,
-        -10,
-        -10,
-        -10,
-        -10,
+        48,
+        -12,
+        -12,
+        -12,
+        -12,
       ]);
     }
     rooms.last.send('next');
@@ -344,11 +426,86 @@ void main() {
     expect(host.view['round'], 2);
     expect(rooms.map((room) => room.view['maal']), everyElement(isNull));
   });
+
+  test(
+    'LAN validates Dublee actions and keeps unrevealed maal private',
+    () async {
+      final host = await hostMarriageRoom(
+        'Host',
+        2,
+        port: 0,
+        random: _DealHand(_dubleeHand, stockTop: [74, 62]),
+      );
+      addTearDown(host.dispose);
+      final guest = await joinMarriageRoom(
+        '127.0.0.1',
+        'Guest',
+        host.roomCode!,
+        port: host.port!,
+      );
+      addTearDown(guest.dispose);
+
+      Future<void> act(
+        String action, [
+        Map<String, Object?> fields = const {},
+      ]) async {
+        final before = host.view['revision'];
+        host.send(action, fields);
+        await _waitForMarriage(host, () => host.view['revision'] != before);
+        await _waitForMarriage(
+          guest,
+          () => guest.view['revision'] == host.view['revision'],
+        );
+      }
+
+      await act('ready', {'ready': true});
+      guest.send('ready', {'ready': true});
+      await _waitForMarriage(
+        host,
+        () => _marriagePlayers(host).every((player) => player['ready'] == true),
+      );
+      await act('start');
+      expect(host.view['availableDublees'], 8);
+      expect(host.view['maal'], isNull);
+      await act('showDublees');
+      expect(guest.view['maal'], isNull);
+      expect(_marriagePlayers(guest).first['dublees'], 7);
+      expect(host.view['canTakeDiscard'], true);
+      await act('draw', {'fromDiscard': true});
+      host.send('layDublee', {
+        'cards': [20, 72],
+      });
+      await _waitForMarriage(host, () => host.notice != null);
+      expect(host.view['discardable'], isEmpty);
+      await act('layDublee', {
+        'cards': [10, 62],
+      });
+      await act('discard', {'card': 30});
+      expect(guest.view['winner'], 0);
+      expect(_marriagePlayers(guest).map((player) => player['roundPoints']), [
+        25,
+        -25,
+      ]);
+      expect(_marriagePlayers(guest).first['maalPoints'], 10);
+      expect(guest.view['maal'], isNull);
+    },
+  );
 }
 
 final _marriageWinningHand = [
   ...List.generate(12, (index) => index),
   ...List.generate(9, (index) => index + 13),
+];
+
+final _dubleeHand = [
+  for (var face = 0; face < 7; face++) ...[face, face + standardDeckSize],
+  10,
+  20,
+  72,
+  21,
+  22,
+  23,
+  30,
 ];
 
 List<Map<String, dynamic>> _marriagePlayers(LanRoom<MarriageGame> room) =>
@@ -371,14 +528,28 @@ Future<void> _waitForMarriage(
 }
 
 // List.shuffle swaps from its last index toward its first. Supply the swaps
-// for one fixture deck so the player receives seven known groups.
+// for one fixture deck with known cards in a player's hand and the stock.
 class _DealHand implements Random {
-  _DealHand(List<int> hand)
-    : _target = [
-        for (var card = 0; card < marriageDeckSize; card++)
-          if (!hand.contains(card)) card,
-        ...hand,
-      ];
+  _DealHand(List<int> hand, {int seat = 0, List<int> stockTop = const []})
+    : _target = _fixtureDeck(hand, seat, stockTop);
+
+  static List<int> _fixtureDeck(List<int> hand, int seat, List<int> stockTop) {
+    final specified = {
+      for (var index = 0; index < hand.length; index++)
+        marriageDeckSize - (seat + 1) * MarriageGame.handSize + index:
+            hand[index],
+      for (var index = 0; index < stockTop.length; index++)
+        marriageDeckSize - 2 * MarriageGame.handSize - index - 1:
+            stockTop[index],
+    };
+    final rest = List.generate(marriageDeckSize, (card) => card)
+      ..removeWhere(specified.values.contains);
+    var next = 0;
+    return List.generate(
+      marriageDeckSize,
+      (index) => specified[index] ?? rest[next++],
+    );
+  }
 
   final List<int> _target;
   final _current = List.generate(marriageDeckSize, (card) => card);

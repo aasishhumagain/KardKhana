@@ -74,16 +74,30 @@ with any remainder paid in order from the first seat of the hand.
 
 **Marriage** supports tables of two to five offline or on the same Wi-Fi
 network or hotspot. The host chooses the table size and shares the IP address
-and room code. Each player sees only their own hand and unlocks the maal
-individually. This sequence variant
-uses three decks, three printed jokers, and 21 cards per player. Select three
-cards and tap **Lay group**. Three pure runs or tunnellas unlock the hidden
-maal. The maal's rank, adjacent ranks in its suit, and printed jokers become
-wild for runs and trials once you have seen it. Ace sits between king and two
-when finding the neighboring maal cards. Each turn allows one draw from
-stock or discard, followed by one discard. The first seven declared groups
-win the hand after any required final discard. Each other seat pays 3 points
-if it saw the maal or 10 otherwise. An exhausted stock ends the hand in a draw.
+and room code. The game uses three decks, three printed jokers, and 21 cards
+per player. Each player unlocks the hidden maal individually.
+
+- **Sequence route.** Select three cards and tap **Lay group**. Three pure
+  runs or tunnellas (three identical cards) reveal the maal. Its rank, its
+  neighbors in the same suit, and printed jokers become wild for runs and
+  trials. Ace sits between king and two when finding the maal neighbors.
+  After seeing, a sequence player draws from stock when the top discard is
+  wild. Seven declared groups finish the hand after any required discard.
+- **Dublee route.** Before laying any three-card groups, collect seven pairs
+  of identical ranks and suits and tap **Show 7 Dublees** to reveal the maal.
+  Printed jokers and wildcard substitutions cannot make a pair. After the
+  show, you can take the top discard only if it makes your final pair with a
+  card in your hand. Draw, select the eighth pair, tap **Lay eighth Dublee**,
+  and discard one card to finish.
+- **Scoring.** Players who saw the maal score the Tiplu, Poplu, and Jhiplu they
+  still hold or have laid. One Tiplu is worth 3 and two are worth 7. Poplu and
+  Jhiplu are each worth 2, 5, or 10 for one, two, or three copies. A Marriage
+  combines all three faces for 10 points, or 30 for two sets. Each card scores
+  once. Players exchange the differences in their maal scores. Each opponent
+  also pays the finisher 3 points if they saw the maal or 10 otherwise, plus
+  5 after a Dublee finish. An exhausted stock ends the hand in a draw.
+
 [Marriage rules reference](https://bhoos.games/blog/learn-to-play-the-best-marriage-card-game/)
+[Marriage scoring reference](https://www.pagat.com/rummy/marriage.html#score)
 
 Internet play is planned for the Go backend.
