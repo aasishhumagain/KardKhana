@@ -92,7 +92,7 @@ class _MarriagePageState extends State<MarriagePage> {
       _message = null;
       _selected.clear();
     });
-    if (room == null) _scheduleCpu();
+    if (room == null && action != 'next') _scheduleCpu();
   }
 
   void _draw({required bool fromDiscard}) => _submit('draw', {
@@ -168,6 +168,7 @@ class _MarriagePageState extends State<MarriagePage> {
     return GameTableScreen(
       title: room == null ? 'Marriage · Offline' : 'Marriage',
       view: view,
+      onDealFinished: room == null ? _scheduleCpu : null,
       actions: phase == 'playing' && (room?.connected ?? true)
           ? _turnActions(view)
           : null,

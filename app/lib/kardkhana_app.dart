@@ -7,14 +7,16 @@ import 'cards/playing_card.dart';
 import 'marriage/marriage_game.dart';
 import 'marriage/marriage_page.dart';
 import 'offline/offline_table_widgets.dart';
+import 'settings/game_feedback.dart';
 import 'settings/settings_page.dart';
 import 'teen_patti/teen_patti_game.dart';
 import 'teen_patti/teen_patti_page.dart';
 
 class KardKhanaApp extends StatelessWidget {
-  const KardKhanaApp({required this.appearance, super.key});
+  const KardKhanaApp({required this.appearance, this.feedback, super.key});
 
   final ValueNotifier<ThemeMode> appearance;
+  final GameFeedback? feedback;
 
   @override
   Widget build(BuildContext context) => ValueListenableBuilder<ThemeMode>(
@@ -25,6 +27,9 @@ class KardKhanaApp extends StatelessWidget {
       themeMode: mode,
       theme: _lightTheme,
       darkTheme: _darkTheme,
+      builder: (context, child) => feedback == null
+          ? child!
+          : GameFeedbackScope(feedback: feedback!, child: child!),
       home: _GameCatalog(appearance: appearance),
     ),
   );

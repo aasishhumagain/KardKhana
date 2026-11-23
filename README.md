@@ -66,9 +66,11 @@ host IP and room code. Guests join from **Teen Patti → Join room**. Everyone
 marks ready before the host starts. Each player starts
 with 30 virtual points and pays a one-point boot per hand. Look to play seen,
 call with Chaal, raise the blind stake, or Pack. Seen actions cost twice the
-blind stake, which caps at eight. Show is available with two active players,
-and the table automatically compares active hands after twice the starting
-table size in turns. A-K-Q outranks A-2-3, then K-Q-J. Ties split the pot,
+blind stake, which caps at eight. With two active players, a blind player
+can always request Show if they can pay the stake. A seen player can request
+Show when the opponent has also looked. The table automatically compares
+active hands after twice the starting table size in turns.
+A-K-Q outranks A-2-3, then K-Q-J. Ties split the pot,
 with any remainder paid in order from the first seat of the hand.
 [Teen Patti rules reference](https://www.teenpatti.com/blog/teen-patti-rules/)
 

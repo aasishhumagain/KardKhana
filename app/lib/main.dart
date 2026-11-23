@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'kardkhana_app.dart';
+import 'settings/game_feedback.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,5 +30,6 @@ Future<void> main() async {
     });
   });
 
-  runApp(KardKhanaApp(appearance: appearance));
+  final feedback = await GameFeedback.load(preferences);
+  runApp(KardKhanaApp(appearance: appearance, feedback: feedback));
 }

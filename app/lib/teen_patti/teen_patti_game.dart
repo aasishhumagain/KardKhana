@@ -109,13 +109,18 @@ class TeenPattiGame {
 
   Set<TeenPattiAction> actionsFor(int seat) {
     if (complete || _turn != seat) return const {};
+    final active = [
+      for (var other = 0; other < playerCount; other++)
+        if (_active[other]) other,
+    ];
     return {
       if (!_seen[seat]) TeenPattiAction.look,
       if (_points[seat] >= callCost(seat)) TeenPattiAction.call,
       if (_stake < stakeCap && _points[seat] >= raiseCost(seat))
         TeenPattiAction.raise,
       TeenPattiAction.pack,
-      if (_active.where((active) => active).length == 2 &&
+      if (active.length == 2 &&
+          (!_seen[seat] || active.every((other) => _seen[other])) &&
           _points[seat] >= callCost(seat))
         TeenPattiAction.show,
     };

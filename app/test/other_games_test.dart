@@ -93,6 +93,22 @@ void main() {
     expect(game.turn, 2);
   });
 
+  test('Teen Patti seen player can only Show against another seen player', () {
+    final game = TeenPattiGame(3, random: Random(6));
+    expect(game.act(0, TeenPattiAction.look), true);
+    expect(game.act(0, TeenPattiAction.call), true);
+    expect(game.act(1, TeenPattiAction.call), true);
+    expect(game.act(2, TeenPattiAction.pack), true);
+    expect(game.actionsFor(0), isNot(contains(TeenPattiAction.show)));
+    final pot = game.pot;
+    expect(game.act(0, TeenPattiAction.show), false);
+    expect(game.pot, pot);
+    expect(game.act(0, TeenPattiAction.call), true);
+    expect(game.actionsFor(1), contains(TeenPattiAction.show));
+    expect(game.act(1, TeenPattiAction.show), true);
+    expect(game.showdown, true);
+  });
+
   test('Marriage distinguishes pure runs, tunnellas, trials and wildcards', () {
     expect(isMarriageGroup([0, 1, 2]), true);
     expect(isMarriageGroup([12, 0, 1]), true);

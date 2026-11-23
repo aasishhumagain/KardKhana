@@ -21,4 +21,24 @@ void main() {
       table.dispose();
     }
   });
+
+  testWidgets('offline Call Break waits until the visual deal finishes', (
+    tester,
+  ) async {
+    final table = OfflineCallBreak(random: Random(19), animateDeals: true);
+    try {
+      if (table.view['turn'] == 0) table.send('bid', {'bid': 3});
+      final cpu = table.view['turn'] as int;
+      Object? bid() => (table.view['players'] as List)[cpu]['bid'];
+      await tester.pump(const Duration(seconds: 2));
+      expect(bid(), isNull);
+      table.completeDeal();
+      await tester.pump(const Duration(milliseconds: 1499));
+      expect(bid(), isNull);
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(bid(), isNotNull);
+    } finally {
+      table.dispose();
+    }
+  });
 }

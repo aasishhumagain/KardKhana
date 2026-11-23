@@ -1,6 +1,11 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:material_ui/material_ui.dart';
 
+import '../settings/game_feedback.dart';
 import '../table_log.dart';
+import 'deal_animation.dart';
 import 'table_widgets.dart';
 
 class GameTableScreen extends StatefulWidget {
@@ -9,6 +14,7 @@ class GameTableScreen extends StatefulWidget {
     required this.view,
     required this.table,
     this.actions,
+    this.onDealFinished,
     this.roundLabel = 'Hand',
     super.key,
   });
@@ -17,6 +23,7 @@ class GameTableScreen extends StatefulWidget {
   final Map<String, dynamic> view;
   final Widget table;
   final Widget? actions;
+  final VoidCallback? onDealFinished;
   final String roundLabel;
 
   @override
@@ -26,17 +33,119 @@ class GameTableScreen extends StatefulWidget {
 class _GameTableScreenState extends State<GameTableScreen> {
   final _playerNames = <int, String>{};
   bool _showLog = false;
+  late bool _dealing;
+  int _dealNumber = 0;
+  GameFeedback? _feedback;
 
   @override
   void initState() {
     super.initState();
     _rememberPlayers();
+    _dealing = _playing(widget.view);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _feedback = GameFeedbackScope.maybeOf(context);
   }
 
   @override
   void didUpdateWidget(covariant GameTableScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     _rememberPlayers();
+    if (!_playing(widget.view)) {
+      _dealing = false;
+    } else if (!_playing(oldWidget.view) ||
+        oldWidget.view['round'] != widget.view['round']) {
+      _dealing = true;
+      _dealNumber++;
+      return;
+    }
+    if (!_dealing) _feedbackForMoves(oldWidget.view);
+  }
+
+  static bool _playing(Map<String, dynamic> view) =>
+      view['phase'] == 'bidding' || view['phase'] == 'playing';
+
+  void _finishDeal() {
+    if (!_dealing) return;
+    setState(() => _dealing = false);
+    widget.onDealFinished?.call();
+  }
+
+  void _feedbackForMoves(Map<String, dynamic> previous) {
+    final feedback = _feedback;
+    if (feedback == null ||
+        (!feedback.soundEnabled && !feedback.vibrationEnabled)) {
+      return;
+    }
+    final before = TableLog.readView(previous['log']);
+    final after = TableLog.readView(widget.view['log']);
+    var overlap = math.min(before.length, after.length);
+    // The capped log can discard its oldest moves while appending new ones.
+    while (overlap > 0 && !_sameMoves(before, after, overlap)) {
+      overlap--;
+    }
+
+    final sounds = <CardSound>[];
+    var localAction = false;
+    for (final entry in after.skip(overlap)) {
+      if (entry.round != widget.view['round'] || entry.move == TableMove.result) {
+        continue;
+      }
+      localAction |= entry.seat == widget.view['seat'];
+      final sound = switch (entry.move) {
+        TableMove.draw => CardSound.pickUp,
+        TableMove.discard || TableMove.play => CardSound.drop,
+        TableMove.decision
+            when entry.message == 'Looked at their cards' &&
+                entry.seat == widget.view['seat'] =>
+          CardSound.pickUp,
+        _ => null,
+      };
+      if (sound != null) sounds.add(sound);
+    }
+    if (localAction) feedback.tap();
+    if (sounds.isNotEmpty && feedback.soundEnabled) {
+      unawaited(_playSounds(feedback, sounds, _dealNumber));
+    }
+  }
+
+  bool _sameMoves(
+    List<TableLogEntry> before,
+    List<TableLogEntry> after,
+    int count,
+  ) {
+    final first = before.length - count;
+    for (var i = 0; i < count; i++) {
+      if (before[first + i] != after[i]) return false;
+    }
+    return true;
+  }
+
+  Future<void> _playSounds(
+    GameFeedback feedback,
+    List<CardSound> sounds,
+    int deal,
+  ) async {
+    for (var i = 0; i < sounds.length; i++) {
+      if (i != 0) await Future<void>.delayed(const Duration(milliseconds: 130));
+      if (!mounted || _dealNumber != deal) return;
+      await feedback.play(sounds[i]);
+    }
+  }
+
+  List<String> _dealSeats() {
+    final players = (widget.view['players'] as List)
+        .cast<Map<String, dynamic>>();
+    final localSeat = widget.view['seat'] as int;
+    return [
+      for (var offset = 0; offset < players.length; offset++)
+        if (players[(localSeat + offset) % players.length]['note'] !=
+            'Out of points')
+          _playerName((localSeat + offset) % players.length),
+    ];
   }
 
   void _rememberPlayers() {
@@ -84,24 +193,41 @@ class _GameTableScreenState extends State<GameTableScreen> {
         title: Text(_showLog ? 'Game log' : widget.title),
       ),
       body: SafeArea(
-        child: IndexedStack(
-          index: _showLog ? 1 : 0,
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(child: widget.table),
-                ?widget.actions,
-              ],
+            IgnorePointer(
+              ignoring: _dealing,
+              child: ExcludeSemantics(
+                excluding: _dealing,
+                child: IndexedStack(
+                  index: _showLog ? 1 : 0,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: widget.table),
+                        ?widget.actions,
+                      ],
+                    ),
+                    if (_showLog)
+                      _GameLog(
+                        entries: TableLog.readView(widget.view['log']),
+                        playerName: _playerName,
+                        roundLabel: widget.roundLabel,
+                      )
+                    else
+                      const SizedBox.shrink(),
+                  ],
+                ),
+              ),
             ),
-            if (_showLog)
-              _GameLog(
-                entries: TableLog.readView(widget.view['log']),
-                playerName: _playerName,
-                roundLabel: widget.roundLabel,
-              )
-            else
-              const SizedBox.shrink(),
+            if (_dealing)
+              DealAnimation(
+                key: ValueKey(_dealNumber),
+                seats: _dealSeats(),
+                onComplete: _finishDeal,
+              ),
           ],
         ),
       ),

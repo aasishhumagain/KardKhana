@@ -11,7 +11,7 @@ import 'call_break_session.dart';
 import 'offline_call_break.dart';
 
 void openOfflineCallBreak(BuildContext context) {
-  final session = OfflineCallBreak();
+  final session = OfflineCallBreak(animateDeals: true);
   Navigator.of(context).push<void>(
     MaterialPageRoute<void>(builder: (_) => _CallBreakTable(session: session)),
   );
@@ -67,6 +67,9 @@ class _CallBreakTableState extends State<_CallBreakTable> {
           title: room == null ? 'Call Break · Offline' : 'Call Break',
           view: view,
           roundLabel: 'Round',
+          onDealFinished: session is OfflineCallBreak
+              ? session.completeDeal
+              : null,
           actions:
               phase == 'bidding' &&
                   seat == view['turn'] &&

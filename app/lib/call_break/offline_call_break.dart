@@ -6,9 +6,13 @@ import 'call_break_game.dart';
 import 'call_break_session.dart';
 
 class OfflineCallBreak extends CallBreakSession {
-  OfflineCallBreak({Random? random, this._cpuDelay = offlineCpuTurnDelay})
-    : _random = random ?? Random.secure() {
+  OfflineCallBreak({
+    Random? random,
+    this._cpuDelay = offlineCpuTurnDelay,
+    this.animateDeals = false,
+  }) : _random = random ?? Random.secure() {
     _dealMatch();
+    _dealing = animateDeals;
     _scheduleCpuTurn();
   }
 
@@ -20,8 +24,10 @@ class OfflineCallBreak extends CallBreakSession {
 
   final Random _random;
   final Duration _cpuDelay;
+  final bool animateDeals;
   late CallBreakGame _game;
   Timer? _cpuTimer;
+  bool _dealing = false;
 
   @override
   Map<String, dynamic> get view => {
@@ -40,7 +46,16 @@ class OfflineCallBreak extends CallBreakSession {
       'rematch' when _game.phase == CallBreakPhase.matchEnd => _dealMatch(),
       _ => false,
     };
-    if (accepted) _tableChanged();
+    if (accepted) {
+      if (action == 'next' || action == 'rematch') _dealing = animateDeals;
+      _tableChanged();
+    }
+  }
+
+  void completeDeal() {
+    if (!_dealing) return;
+    _dealing = false;
+    _scheduleCpuTurn();
   }
 
   bool _dealMatch() {
@@ -57,7 +72,8 @@ class OfflineCallBreak extends CallBreakSession {
     _cpuTimer?.cancel();
     final seat = _game.turn;
     final phase = _game.phase;
-    if (seat == _humanSeat ||
+    if (_dealing ||
+        seat == _humanSeat ||
         (phase != CallBreakPhase.bidding && phase != CallBreakPhase.playing)) {
       return;
     }

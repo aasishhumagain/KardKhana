@@ -97,7 +97,6 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
         _game.nextRound();
       }
     });
-    _scheduleCpu();
   }
 
   Map<String, dynamic> _offlineView() => {
@@ -124,6 +123,7 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
     return GameTableScreen(
       title: room == null ? 'Teen Patti · Offline' : 'Teen Patti',
       view: view,
+      onDealFinished: room == null ? _scheduleCpu : null,
       actions: phase == 'playing' && (room?.connected ?? true)
           ? _turnActions(view)
           : null,
