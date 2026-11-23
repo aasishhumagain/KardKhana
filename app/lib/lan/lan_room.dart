@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import '../table_log.dart';
 import '../table_session.dart';
 
 const lanRoomPort = 45678;
@@ -38,7 +39,8 @@ class LanGame<GameState extends Object> {
   final int minPlayers;
   final int maxPlayers;
   final GameState Function(int players) create;
-  final bool Function(GameState match, int seat, Map<String, dynamic> message) act;
+  final bool Function(GameState match, int seat, Map<String, dynamic> message)
+  act;
   final bool Function(GameState match) canRematch;
   final Map<String, dynamic> Function(
     GameState? match,
@@ -79,13 +81,13 @@ class LanRoom<GameState extends Object> extends TableSession {
     if (seats < room.game.minPlayers || seats > room.game.maxPlayers) {
       throw const LanRoomException('Choose a valid table size.');
     }
-    final host = _RoomHost(
+    final host = _RoomHost<GameState>(
       await HttpServer.bind(InternetAddress.anyIPv4, port),
       room.game,
       seats,
     );
-    room._host = host;
     try {
+      room._host = host;
       await room._connect(
         InternetAddress.loopbackIPv4.address,
         host.server.port,
@@ -203,6 +205,7 @@ class LanRoom<GameState extends Object> extends TableSession {
         seat >= players.length ||
         view['revision'] is! int ||
         phase is! String ||
+        !TableLog.validView(view['log'], players.length) ||
         (view['ended'] != null && view['ended'] is! String)) {
       return false;
     }

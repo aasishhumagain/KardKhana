@@ -1,10 +1,11 @@
 import 'dart:math';
 
 import '../cards/standard_cards.dart';
+import '../table_log.dart';
 
 const _printedJokerStart = standardDeckSize * 3;
-const _deckSize = _printedJokerStart + 3;
-const _groupSize = 3;
+const marriageDeckSize = _printedJokerStart + 3;
+const marriageGroupSize = 3;
 final _runs = [
   [14, 2, 3],
   for (var low = 2; low <= 12; low++) [low, low + 1, low + 2],
@@ -25,9 +26,9 @@ bool isMarriageWild(int card, int maal) {
 }
 
 bool isMarriageGroup(List<int> cards, {int? maal}) {
-  if (cards.length != _groupSize ||
-      cards.toSet().length != _groupSize ||
-      cards.any((card) => card < 0 || card >= _deckSize)) {
+  if (cards.length != marriageGroupSize ||
+      cards.toSet().length != marriageGroupSize ||
+      cards.any((card) => card < 0 || card >= marriageDeckSize)) {
     return false;
   }
 
@@ -81,10 +82,11 @@ class MarriageGame {
   static const maxPlayers = 5;
   static const handSize = 21;
   static const groupsToReveal = 3;
-  static const groupsToWin = handSize ~/ _groupSize;
+  static const groupsToWin = handSize ~/ marriageGroupSize;
 
   final int playerCount;
   final Random _random;
+  final _log = TableLog();
   final List<int> _points;
   late List<List<int>> _hands;
   late List<List<List<int>>> _groups;
@@ -108,6 +110,7 @@ class MarriageGame {
   int get stockCount => _stock.length;
   bool get complete => _complete;
   bool get hasDrawn => _hasDrawn;
+  List<List<Object>> get logView => _log.toView();
 
   int groupCount(int seat) => _groups[seat].length;
   bool hasSeenMaal(int seat) => groupCount(seat) >= groupsToReveal;
@@ -127,6 +130,14 @@ class MarriageGame {
     _pickedDiscard = fromDiscard ? card : null;
     _hasDrawn = true;
     _notes[seat] = fromDiscard ? 'Picked up the discard' : 'Drew from stock';
+    _log.add(
+      _round,
+      seat,
+      TableMove.draw,
+      fromDiscard
+          ? 'Picked up ${marriageCardLabel(card)} from the discard pile'
+          : 'Drew a card from stock',
+    );
     return true;
   }
 
@@ -142,6 +153,7 @@ class MarriageGame {
     }
     _groups[seat].add(List.of(cards));
     _notes[seat] = 'Laid group ${groupCount(seat)}';
+    _log.add(_round, seat, TableMove.decision, _notes[seat]);
     if (groupCount(seat) == groupsToWin && !_hasDrawn) _finish(seat);
     return true;
   }
@@ -158,6 +170,7 @@ class MarriageGame {
     _hands[seat].remove(card);
     _discard.add(card);
     _notes[seat] = 'Discarded ${marriageCardLabel(card)}';
+    _log.add(_round, seat, TableMove.discard, _notes[seat]);
     if (groupCount(seat) == groupsToWin) {
       _finish(seat);
     } else if (_stock.isEmpty) {
@@ -226,7 +239,7 @@ class MarriageGame {
   }
 
   void _deal() {
-    _stock = List.generate(_deckSize, (card) => card)..shuffle(_random);
+    _stock = List.generate(marriageDeckSize, (card) => card)..shuffle(_random);
     _hands = List.generate(playerCount, (_) {
       final hand = List.generate(handSize, (_) => _stock.removeLast());
       _sortHand(hand);
@@ -250,6 +263,7 @@ class MarriageGame {
   void _finish(int seat) {
     _winner = seat;
     _complete = true;
+    _log.add(_round, seat, TableMove.result, 'Won the hand');
     for (var other = 0; other < playerCount; other++) {
       if (other == seat) continue;
       final paid = hasSeenMaal(other) ? 3 : 10;

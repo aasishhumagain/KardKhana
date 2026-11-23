@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import '../cards/standard_cards.dart';
+import '../table_log.dart';
 
 export '../cards/standard_cards.dart'
     show CardSuit, cardLabel, cardRank, cardSuit;
@@ -28,6 +29,7 @@ class CallBreakGame {
   final _scores = List.filled(playerCount, 0);
   final _roundScores = List.filled(playerCount, 0);
   final _trick = <PlayedCard>[];
+  final _log = TableLog();
 
   late List<List<int>> _hands;
   late List<int?> _bids;
@@ -49,6 +51,7 @@ class CallBreakGame {
   List<int> get roundScores => List.unmodifiable(_roundScores);
   List<PlayedCard> get trick => List.unmodifiable(_trick);
   List<PlayedCard> get lastTrick => List.unmodifiable(_lastTrick);
+  List<List<Object>> get logView => _log.toView();
 
   List<int> handFor(int seat) => List.unmodifiable(_hands[seat]);
 
@@ -65,6 +68,7 @@ class CallBreakGame {
       return false;
     }
     _bids[seat] = value;
+    _log.add(_round, seat, TableMove.decision, 'Bid $value');
     _turn = (seat + 1) % playerCount;
     if (_turn == _firstSeat) _phase = CallBreakPhase.playing;
     return true;
@@ -75,6 +79,7 @@ class CallBreakGame {
 
     _hands[seat].remove(card);
     _trick.add(PlayedCard(seat, card));
+    _log.add(_round, seat, TableMove.play, 'Played ${cardLabel(card)}');
     if (_trick.length < playerCount) {
       _turn = (seat + 1) % playerCount;
       return true;
@@ -82,6 +87,7 @@ class CallBreakGame {
 
     final winner = _winningPlay(_trick).seat;
     _tricksWon[winner]++;
+    _log.add(_round, winner, TableMove.result, 'Won the trick');
     _lastTrick = List.of(_trick);
     _lastWinner = winner;
     _trick.clear();

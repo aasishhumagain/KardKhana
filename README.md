@@ -72,7 +72,10 @@ table size in turns. A-K-Q outranks A-2-3, then K-Q-J. Ties split the pot,
 with any remainder paid in order from the first seat of the hand.
 [Teen Patti rules reference](https://www.teenpatti.com/blog/teen-patti-rules/)
 
-**Marriage** supports offline tables of two to five. This sequence variant
+**Marriage** supports tables of two to five offline or on the same Wi-Fi
+network or hotspot. The host chooses the table size and shares the IP address
+and room code. Each player sees only their own hand and unlocks the maal
+individually. This sequence variant
 uses three decks, three printed jokers, and 21 cards per player. Select three
 cards and tap **Lay group**. Three pure runs or tunnellas unlock the hidden
 maal. The maal's rank, adjacent ranks in its suit, and printed jokers become
@@ -82,5 +85,4 @@ win the hand after any required final discard. Each other seat pays 3 points
 if it saw the maal or 10 otherwise. An exhausted stock ends the hand in a draw.
 [Marriage rules reference](https://bhoos.games/blog/learn-to-play-the-best-marriage-card-game/)
 
-Marriage currently runs on one phone with CPU opponents. Internet play is
-planned for the Go backend.
+Internet play is planned for the Go backend.

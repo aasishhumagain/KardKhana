@@ -2,10 +2,13 @@ import 'dart:async';
 
 import 'package:material_ui/material_ui.dart';
 
-import '../cards/standard_cards.dart';
+import '../cards/playing_card.dart';
 import '../lan/lan_room.dart';
 import '../lan/lan_room_setup_page.dart';
 import '../offline/offline_table_widgets.dart';
+import '../offline/offline_turn_pacing.dart';
+import '../ui/game_table_screen.dart';
+import '../ui/table_widgets.dart';
 import 'teen_patti_game.dart';
 import 'teen_patti_room.dart';
 
@@ -65,7 +68,7 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
   void _scheduleCpu() {
     _cpu?.cancel();
     if (_game.complete || _game.turn == 0) return;
-    _cpu = Timer(const Duration(milliseconds: 450), () {
+    _cpu = Timer(offlineCpuTurnDelay, () {
       setState(_game.playCpuTurn);
       _scheduleCpu();
     });
@@ -107,50 +110,42 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
   @override
   Widget build(BuildContext context) {
     final room = widget.room;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(room == null ? 'Teen Patti · Offline' : 'Teen Patti'),
-      ),
-      body: SafeArea(
-        child: room == null
-            ? _table(context, _offlineView())
-            : ListenableBuilder(
-                listenable: room,
-                builder: (context, _) => _table(context, room.view),
-              ),
-      ),
+    if (room == null) return _table(context, _offlineView());
+    return ListenableBuilder(
+      listenable: room,
+      builder: (context, _) => _table(context, room.view),
     );
   }
 
   Widget _table(BuildContext context, Map<String, dynamic> view) {
     final room = widget.room;
     final phase = view['phase'] as String;
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        if (room?.notice case final notice?)
-          Text(
-            notice,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
-        if (room != null && (!room.connected || phase == 'ended'))
-          Text(
-            view['ended'] as String? ??
-                'Return to the catalog to join a new room.',
-          )
-        else if (room != null && phase == 'lobby')
-          LanRoomLobby(room: room, addresses: widget.addresses)
-        else
-          ..._match(context, view, phase == 'roundEnd'),
-      ],
+    return GameTableScreen(
+      title: room == null ? 'Teen Patti · Offline' : 'Teen Patti',
+      view: view,
+      table: ListView(
+        padding: tablePadding,
+        children: [
+          if (room?.notice case final notice?)
+            Text(
+              notice,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          if (room != null && (!room.connected || phase == 'ended'))
+            Text(
+              view['ended'] as String? ??
+                  'Return to the catalog to join a new room.',
+            )
+          else if (room != null && phase == 'lobby')
+            LanRoomLobby(room: room, addresses: widget.addresses)
+          else
+            ..._match(view, phase == 'roundEnd'),
+        ],
+      ),
     );
   }
 
-  List<Widget> _match(
-    BuildContext context,
-    Map<String, dynamic> view,
-    bool complete,
-  ) {
+  List<Widget> _match(Map<String, dynamic> view, bool complete) {
     final players = (view['players'] as List).cast<Map<String, dynamic>>();
     final seat = view['seat'] as int;
     final turn = view['turn'] as int;
@@ -177,12 +172,14 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
         : '${names[turn]} is playing';
 
     return [
-      Text(
-        'Hand ${view['round']} · Pot $pot points · $banner',
-        style: Theme.of(context).textTheme.titleMedium,
+      TableStatus(
+        progress: 'Hand ${view['round']} · Pot $pot',
+        status: banner,
+        yourTurn: !complete && turn == seat,
+        complete: complete,
       ),
       const SizedBox(height: 8),
-      OfflineSeats(
+      TableSeats(
         activeSeat: complete ? null : turn,
         names: names,
         status: [
@@ -194,7 +191,17 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
       if (ownHand.isNotEmpty)
         _handRow('Your hand', ownHand)
       else if (!complete && players[seat]['note'] != 'Out of points')
-        const Text('Your cards are face down. Look to play seen.'),
+        const Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _CardBack(),
+            _CardBack(),
+            _CardBack(),
+            Text('Your cards are face down. Look to play seen.'),
+          ],
+        ),
       if (available.isNotEmpty) ...[
         const SizedBox(height: 8),
         Wrap(
@@ -241,13 +248,30 @@ Widget _handRow(String title, List<int> hand) => Padding(
     crossAxisAlignment: WrapCrossAlignment.center,
     children: [
       Text('$title · ${rankTeenPattiHand(hand).kind.label}'),
-      for (final card in hand)
-        OfflineCard(
-          cardLabel(card),
-          red:
-              cardSuit(card) == CardSuit.hearts ||
-              cardSuit(card) == CardSuit.diamonds,
-        ),
+      for (final card in hand) PlayingCard(card, portrait: true),
     ],
   ),
 );
+
+class _CardBack extends StatelessWidget {
+  const _CardBack();
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: Container(
+      width: 30,
+      height: 40,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xFF421952),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFF9670A7)),
+      ),
+      child: const Icon(
+        Icons.diamond_outlined,
+        size: 14,
+        color: Color(0xFFF0C77D),
+      ),
+    ),
+  );
+}

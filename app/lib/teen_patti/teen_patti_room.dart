@@ -6,14 +6,25 @@ Future<LanRoom<TeenPattiGame>> hostTeenPattiRoom(
   String name,
   int seats, {
   int port = lanRoomPort,
-}) => LanRoom.hostRoom(LanRoom(_rules), name, seats: seats, port: port);
+}) => LanRoom.hostRoom<TeenPattiGame, LanRoom<TeenPattiGame>>(
+  LanRoom(_rules),
+  name,
+  seats: seats,
+  port: port,
+);
 
 Future<LanRoom<TeenPattiGame>> joinTeenPattiRoom(
   String address,
   String name,
   String code, {
   int port = lanRoomPort,
-}) => LanRoom.joinRoom(LanRoom(_rules), address, name, code, port: port);
+}) => LanRoom.joinRoom<TeenPattiGame, LanRoom<TeenPattiGame>>(
+  LanRoom(_rules),
+  address,
+  name,
+  code,
+  port: port,
+);
 
 final _rules = LanGame<TeenPattiGame>(
   title: 'Teen Patti',
@@ -62,13 +73,15 @@ Map<String, dynamic> teenPattiTableView(
   'pot': game?.pot ?? 0,
   'winners': game?.winners ?? const <int>[],
   'canDeal': game?.canDeal ?? false,
+  'log': game?.logView,
 };
 
 Map<String, dynamic> teenPattiSeatView(TeenPattiGame? game, int seat) => {
   'seat': seat,
   'hand': game?.visibleHand(seat, viewer: seat) ?? const <int>[],
   'actions': [
-    for (final action in game?.actionsFor(seat) ?? const {}) action.name,
+    for (final action in game?.actionsFor(seat) ?? const <TeenPattiAction>{})
+      action.name,
   ],
   'callCost': game?.callCost(seat) ?? 0,
   'raiseCost': game?.raiseCost(seat) ?? 0,

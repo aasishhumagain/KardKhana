@@ -1,14 +1,13 @@
 import 'dart:async';
 import 'dart:math';
 
+import '../offline/offline_turn_pacing.dart';
 import 'call_break_game.dart';
 import 'call_break_session.dart';
 
 class OfflineCallBreak extends CallBreakSession {
-  OfflineCallBreak({
-    Random? random,
-    this._cpuDelay = const Duration(milliseconds: 350),
-  }) : _random = random ?? Random.secure() {
+  OfflineCallBreak({Random? random, this._cpuDelay = offlineCpuTurnDelay})
+    : _random = random ?? Random.secure() {
     _dealMatch();
     _scheduleCpuTurn();
   }

@@ -26,6 +26,7 @@ Map<String, dynamic> callBreakTableView(
   'trick': _encodeTrick(game?.trick),
   'lastTrick': _encodeTrick(game?.lastTrick),
   'lastWinner': game?.lastWinner,
+  'log': game?.logView,
 };
 
 Map<String, dynamic> callBreakSeatView(CallBreakGame? game, int seat) => {

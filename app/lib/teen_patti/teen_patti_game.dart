@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import '../cards/standard_cards.dart';
+import '../table_log.dart';
 
 enum TeenPattiHand {
   highCard('High card'),
@@ -69,6 +70,7 @@ class TeenPattiGame {
 
   final int playerCount;
   final Random _random;
+  final _log = TableLog();
   final List<int> _points;
   late List<List<int>> _hands;
   late List<bool> _active;
@@ -92,6 +94,7 @@ class TeenPattiGame {
       complete && _points.where((points) => points >= boot).length >= 2;
   bool get showdown => _showdown;
   List<int> get winners => List.unmodifiable(_winners);
+  List<List<Object>> get logView => _log.toView();
 
   int pointsFor(int seat) => _points[seat];
   String noteFor(int seat) => _notes[seat];
@@ -122,12 +125,14 @@ class TeenPattiGame {
     if (action == TeenPattiAction.look) {
       _seen[seat] = true;
       _notes[seat] = 'Seen';
+      _log.add(_round, seat, TableMove.decision, 'Looked at their cards');
       return true;
     }
     switch (action) {
       case TeenPattiAction.pack:
         _active[seat] = false;
         _notes[seat] = 'Packed';
+        _log.add(_round, seat, TableMove.decision, 'Packed');
       case TeenPattiAction.raise:
         _stake = min(_stake * 2, stakeCap);
         _pay(seat, 'Raise');
@@ -186,6 +191,7 @@ class TeenPattiGame {
     _points[seat] -= paid;
     _pot += paid;
     _notes[seat] = '$label $paid';
+    _log.add(_round, seat, TableMove.decision, '$label · $paid points');
   }
 
   void _deal() {
@@ -245,6 +251,12 @@ class TeenPattiGame {
     final remainder = _pot % _winners.length;
     for (var index = 0; index < _winners.length; index++) {
       _points[_winners[index]] += share + (index < remainder ? 1 : 0);
+      _log.add(
+        _round,
+        _winners[index],
+        TableMove.result,
+        _winners.length == 1 ? 'Won the hand' : 'Shared the pot',
+      );
     }
   }
 }

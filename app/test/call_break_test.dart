@@ -196,6 +196,8 @@ void main() {
         await _waitFor(client, () => client.view['revision'] == revision);
         expect(client.view['phase'], 'matchEnd');
         expect(client.view['hand'], isEmpty);
+        expect(client.view['log'], hasLength(345));
+        expect(client.view['log'], host.view['log']);
       }
     },
   );

@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kardkhana/main.dart' as app;
+import 'package:kardkhana/cards/playing_card.dart';
+import 'package:kardkhana/kardkhana_app.dart';
 import 'package:material_ui/material_ui.dart';
 
 void main() {
@@ -11,8 +12,17 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
 
-    app.main();
+    final appearance = ValueNotifier(ThemeMode.light);
+    addTearDown(appearance.dispose);
+    await tester.pumpWidget(KardKhanaApp(appearance: appearance));
     await tester.pumpAndSettle();
+
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is Image && widget.semanticLabel == 'KardKhana',
+      ),
+      findsOneWidget,
+    );
 
     const games = {
       'Call Break': (
@@ -29,11 +39,14 @@ void main() {
       ),
     };
 
-    final firstCardY = tester.getCenter(find.text(games.keys.first)).dy;
+    double tileTop(Finder title) => tester
+        .getTopLeft(find.ancestor(of: title, matching: find.byType(Card)))
+        .dy;
+    final firstCardY = tileTop(find.text(games.keys.first));
     for (final title in games.keys) {
       final card = find.text(title).hitTestable();
       expect(card, findsOneWidget);
-      expect(tester.getCenter(card).dy, firstCardY);
+      expect(tileTop(card), firstCardY);
     }
 
     for (final game in games.entries) {
@@ -43,6 +56,28 @@ void main() {
       expect(find.text('Choose a game'), findsNothing);
       expect(find.text(game.key), findsOneWidget);
       expect(find.text(game.value.summary), findsOneWidget);
+
+      if (game.key == 'Marriage') {
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Host room'));
+        await tester.pumpAndSettle();
+        for (var count = 2; count <= 5; count++) {
+          expect(
+            find.widgetWithText(ChoiceChip, '$count players'),
+            findsOneWidget,
+          );
+        }
+        expect(find.widgetWithText(ChoiceChip, '6 players'), findsNothing);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.widgetWithText(OutlinedButton, 'Join room'));
+        await tester.pumpAndSettle();
+        expect(find.text('Nickname'), findsOneWidget);
+        expect(find.text('Host IP address'), findsOneWidget);
+        expect(find.text('Room code'), findsOneWidget);
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+      }
 
       final offline = find.widgetWithText(FilledButton, 'Play offline');
       expect(offline.hitTestable(), findsOneWidget);
@@ -72,7 +107,7 @@ void main() {
           );
         }
       }
-      await tester.pageBack();
+      await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
 
       final playerLimit = find.text(game.value.limit);
@@ -83,5 +118,122 @@ void main() {
     }
 
     expect(find.text('Choose a game'), findsOneWidget);
+  });
+
+  testWidgets('Marriage shows a live game log and a shortcut Home', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(800, 360);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final appearance = ValueNotifier(ThemeMode.light);
+    addTearDown(appearance.dispose);
+    await tester.pumpWidget(KardKhanaApp(appearance: appearance));
+    await tester.pumpAndSettle();
+
+    Future<void> tap(Finder target) async {
+      await tester.tap(target);
+      await tester.pumpAndSettle();
+    }
+
+    await tap(find.text('Marriage'));
+    await tap(find.text('Play offline'));
+    await tap(find.text('2 players'));
+    await tap(find.text('Start game'));
+    final home = find.byTooltip('Home');
+    final log = find.byTooltip('Log');
+    expect(tester.getCenter(home).dx, lessThan(tester.getCenter(log).dx));
+    expect(tester.getCenter(log).dx, lessThan(100));
+
+    await tap(log);
+    expect(find.text('Game log'), findsOneWidget);
+    expect(
+      find.text('Moves will appear here as the game is played.'),
+      findsOneWidget,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Marriage · Offline'), findsOneWidget);
+
+    await tap(find.textContaining('Draw stock'));
+    await tap(find.byType(PlayingCard).hitTestable().first);
+    await tap(find.text('Discard selected'));
+    await tap(log);
+    final draw = find.text('Drew a card from stock').hitTestable();
+    final discard = find.textContaining('Discarded ').hitTestable();
+    expect(draw, findsOneWidget);
+    expect(discard, findsOneWidget);
+    expect(tester.getTopLeft(discard).dy, lessThan(tester.getTopLeft(draw).dy));
+
+    await tester.pump(const Duration(milliseconds: 1500));
+    await tester.pumpAndSettle();
+    expect(find.text('CPU 1').hitTestable(), findsWidgets);
+    await tap(home);
+    expect(find.text('Choose a game'), findsOneWidget);
+  });
+
+  testWidgets('compact landscape keeps the game tiles reachable', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(640, 320);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final appearance = ValueNotifier(ThemeMode.dark);
+    addTearDown(appearance.dispose);
+    await tester.pumpWidget(KardKhanaApp(appearance: appearance));
+    await tester.pumpAndSettle();
+
+    for (final name in ['Call Break', 'Teen Patti', 'Marriage']) {
+      expect(find.text(name).hitTestable(), findsOneWidget);
+    }
+    expect(find.byTooltip('Settings').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('settings changes appearance across app screens', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(800, 360);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    final appearance = ValueNotifier(ThemeMode.light);
+    addTearDown(appearance.dispose);
+    await tester.pumpWidget(KardKhanaApp(appearance: appearance));
+    await tester.pumpAndSettle();
+
+    Brightness brightness(String label) =>
+        Theme.of(tester.element(find.text(label))).brightness;
+
+    final settings = find.byTooltip('Settings');
+    expect(tester.getCenter(settings).dx, greaterThan(720));
+    expect(brightness('Choose a game'), Brightness.light);
+    await tester.tap(settings);
+    await tester.pumpAndSettle();
+    expect(find.text('Appearance'), findsOneWidget);
+    await tester.tap(find.text('Dark'));
+    await tester.pumpAndSettle();
+    expect(appearance.value, ThemeMode.dark);
+    expect(brightness('Appearance'), Brightness.dark);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(brightness('Choose a game'), Brightness.dark);
+    await tester.tap(find.text('Call Break'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Play offline'));
+    await tester.pumpAndSettle();
+    expect(brightness('Call Break · Offline'), Brightness.dark);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(settings);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Light'));
+    await tester.pumpAndSettle();
+    expect(appearance.value, ThemeMode.light);
+    expect(brightness('Appearance'), Brightness.light);
   });
 }

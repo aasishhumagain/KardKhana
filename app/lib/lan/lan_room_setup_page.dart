@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:material_ui/material_ui.dart';
 
-import '../offline/offline_table_widgets.dart';
+import '../ui/table_widgets.dart';
 import 'lan_room.dart';
 
 class LanRoomSetupPage<Room extends LanRoom<Object>> extends StatefulWidget {
@@ -221,7 +221,7 @@ class LanRoomLobby extends StatelessWidget {
             'Host IP ${addresses.isEmpty ? 'Use the host’s network settings' : addresses.join(' or ')}',
           ),
         Text('$occupied / ${players.length} seated. All seats must be ready.'),
-        OfflineSeats(
+        TableSeats(
           names: [
             for (var index = 0; index < players.length; index++)
               index == seat

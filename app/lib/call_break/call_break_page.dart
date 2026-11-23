@@ -1,6 +1,9 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../cards/playing_card.dart';
 import '../lan/lan_room_setup_page.dart';
+import '../ui/game_table_screen.dart';
+import '../ui/table_widgets.dart';
 import 'call_break_game.dart';
 import 'call_break_room.dart';
 import 'call_break_session.dart';
@@ -51,47 +54,44 @@ class _CallBreakTableState extends State<_CallBreakTable> {
   Widget build(BuildContext context) {
     final session = widget.session;
     final room = session is CallBreakRoom ? session : null;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(room == null ? 'Call Break · Offline' : 'Call Break'),
-      ),
-      body: SafeArea(
-        child: ListenableBuilder(
-          listenable: session,
-          builder: (context, _) {
-            final view = session.view;
-            final phase = view['phase'] as String;
-            final players = (view['players'] as List)
-                .cast<Map<String, dynamic>>();
-            final seat = view['seat'] as int;
+    return ListenableBuilder(
+      listenable: session,
+      builder: (context, _) {
+        final view = session.view;
+        final phase = view['phase'] as String;
+        final players = (view['players'] as List).cast<Map<String, dynamic>>();
+        final seat = view['seat'] as int;
 
-            return ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                if (room?.notice case final notice?)
-                  _Message(text: notice, isError: true),
-                if (room != null && (!room.connected || phase == 'ended'))
-                  _Message(
-                    text:
-                        view['ended'] as String? ??
-                        'Return to the catalog to join a new room.',
-                  )
-                else if (room != null && phase == 'lobby')
-                  ..._buildLobby(room, players, seat)
-                else
-                  ..._buildMatch(
-                    session,
-                    view,
-                    players,
-                    seat,
-                    phase,
-                    canAdvance: room?.isHost ?? true,
-                  ),
-              ],
-            );
-          },
-        ),
-      ),
+        return GameTableScreen(
+          title: room == null ? 'Call Break · Offline' : 'Call Break',
+          view: view,
+          roundLabel: 'Round',
+          table: ListView(
+            padding: tablePadding,
+            children: [
+              if (room?.notice case final notice?)
+                _Message(text: notice, isError: true),
+              if (room != null && (!room.connected || phase == 'ended'))
+                _Message(
+                  text:
+                      view['ended'] as String? ??
+                      'Return to the catalog to join a new room.',
+                )
+              else if (room != null && phase == 'lobby')
+                ..._buildLobby(room, players, seat)
+              else
+                ..._buildMatch(
+                  session,
+                  view,
+                  players,
+                  seat,
+                  phase,
+                  canAdvance: room?.isHost ?? true,
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -160,6 +160,12 @@ class _CallBreakTableState extends State<_CallBreakTable> {
     final trick = (view['trick'] as List).cast<List<dynamic>>();
     final lastTrick = (view['lastTrick'] as List).cast<List<dynamic>>();
     final lastWinner = view['lastWinner'] as int?;
+    final trickSummary = [
+      if (trick.isNotEmpty) 'Current trick   ${_describeTrick(trick, players)}',
+      if (lastWinner != null)
+        'Last trick · ${players[lastWinner]['name']} won   '
+            '${_describeTrick(lastTrick, players)}',
+    ];
     final status = switch (phase) {
       'bidding' when turn == seat => 'Your bid',
       'bidding' => '${players[turn]['name']} is bidding',
@@ -173,9 +179,13 @@ class _CallBreakTableState extends State<_CallBreakTable> {
     };
 
     return [
-      _Message(
-        text: 'Round $round / ${CallBreakGame.roundsPerMatch}   •   $status',
+      TableStatus(
+        progress: 'Round $round / ${CallBreakGame.roundsPerMatch}',
+        status: status,
+        yourTurn: (bidding || playing) && seat == turn,
+        complete: roundEnd || matchEnd,
       ),
+      const SizedBox(height: 8),
       _Seats(
         players: players,
         localSeat: seat,
@@ -185,12 +195,9 @@ class _CallBreakTableState extends State<_CallBreakTable> {
       const SizedBox(height: 8),
       if (!bidding)
         _Message(
-          text: trick.isNotEmpty
-              ? 'Current trick   ${_describeTrick(trick, players)}'
-              : lastWinner != null
-              ? '${players[lastWinner]['name']} took the last trick   '
-                    '${_describeTrick(lastTrick, players)}'
-              : 'Spades are trump.',
+          text: trickSummary.isEmpty
+              ? 'Spades are trump.'
+              : trickSummary.join('\n'),
         ),
       if (hand.isNotEmpty)
         SingleChildScrollView(
@@ -200,9 +207,9 @@ class _CallBreakTableState extends State<_CallBreakTable> {
             spacing: 6,
             children: [
               for (final card in hand)
-                _PlayingCard(
-                  card: card,
-                  onPlay: legal.contains(card)
+                PlayingCard(
+                  card,
+                  onPressed: legal.contains(card)
                       ? () => session.send('play', {'card': card})
                       : null,
                 ),
@@ -261,81 +268,28 @@ class _Seats extends StatelessWidget {
   final bool showScores;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Row(
-      spacing: 8,
-      children: [
-        for (var seat = 0; seat < players.length; seat++)
-          Expanded(
-            child: Card.outlined(
-              color: seat == activeSeat ? colors.primaryContainer : null,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      seat == localSeat
-                          ? '${players[seat]['name']} (you)'
-                          : players[seat]['name'] as String? ?? 'Open seat',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    Text(
-                      showScores
-                          ? 'Round ${_points(players[seat]['roundScore'] as int)}'
-                                '   Total ${_points(players[seat]['score'] as int)}'
-                          : players[seat]['bid'] != null
-                          ? 'Bid ${players[seat]['bid']}   Won ${players[seat]['tricks']}'
-                          : activeSeat != null
-                          ? 'Waiting to bid'
-                          : players[seat]['name'] == null
-                          ? 'Waiting to join'
-                          : players[seat]['ready'] == true
-                          ? 'Ready'
-                          : 'Not ready',
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _PlayingCard extends StatelessWidget {
-  const _PlayingCard({required this.card, this.onPlay});
-
-  final int card;
-  final VoidCallback? onPlay;
-
-  @override
-  Widget build(BuildContext context) {
-    final suit = cardSuit(card);
-    final red = suit == CardSuit.diamonds || suit == CardSuit.hearts;
-    return OutlinedButton(
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size(46, 52),
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        backgroundColor: Colors.white,
-        foregroundColor: red ? const Color(0xFF9C233B) : Colors.black87,
-        disabledBackgroundColor: Colors.white,
-        disabledForegroundColor: red ? const Color(0xFF9C233B) : Colors.black87,
-        side: BorderSide(
-          width: onPlay == null ? 1 : 2,
-          color: onPlay == null
-              ? const Color(0xFFC9CCC5)
-              : Theme.of(context).colorScheme.primary,
-        ),
-      ),
-      onPressed: onPlay,
-      child: Text(cardLabel(card)),
-    );
-  }
+  Widget build(BuildContext context) => TableSeats(
+    activeSeat: activeSeat,
+    names: [
+      for (var seat = 0; seat < players.length; seat++)
+        seat == localSeat
+            ? '${players[seat]['name']} (you)'
+            : players[seat]['name'] as String? ?? 'Open seat',
+    ],
+    status: [
+      for (final player in players)
+        if (showScores)
+          'Round ${_points(player['roundScore'] as int)} · Total ${_points(player['score'] as int)}'
+        else if (player['bid'] != null)
+          'Bid ${player['bid']} · Won ${player['tricks']}'
+        else if (activeSeat != null)
+          'Waiting to bid'
+        else if (player['name'] == null)
+          'Waiting to join'
+        else
+          player['ready'] == true ? 'Ready' : 'Not ready',
+    ],
+  );
 }
 
 class _Message extends StatelessWidget {

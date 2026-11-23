@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kardkhana/cards/standard_cards.dart';
+import 'package:kardkhana/lan/lan_room.dart';
 import 'package:kardkhana/marriage/marriage_game.dart';
+import 'package:kardkhana/marriage/marriage_room.dart';
 import 'package:kardkhana/teen_patti/teen_patti_game.dart';
 
 void main() {
@@ -77,10 +80,7 @@ void main() {
     'Marriage unlocks the maal with three groups and scores a declaration',
     () {
       expect(() => MarriageGame(6), throwsRangeError);
-      final hand = [
-        ...List.generate(12, (index) => index),
-        ...List.generate(9, (index) => index + 13),
-      ];
+      final hand = _marriageWinningHand;
       final game = MarriageGame(5, random: _DealHand(hand));
       expect(game.handFor(0), unorderedEquals(hand));
       expect(game.maalFor(0), isNull);
@@ -125,6 +125,207 @@ void main() {
     expect(game.nextRound(), true);
     expect(game.round, 2);
   });
+
+  test('five LAN players finish a Marriage hand with private maal', () async {
+    await expectLater(
+      hostMarriageRoom('Host', 6, port: 0),
+      throwsA(isA<LanRoomException>()),
+    );
+    final host = await hostMarriageRoom(
+      'Host',
+      5,
+      port: 0,
+      random: _DealHand(_marriageWinningHand),
+    );
+    final rooms = [host];
+    addTearDown(() {
+      for (final room in rooms.reversed) {
+        room.dispose();
+      }
+    });
+
+    Future<LanRoom<MarriageGame>> join(String name) =>
+        joinMarriageRoom('127.0.0.1', name, host.roomCode!, port: host.port!);
+    for (var seat = 1; seat < 5; seat++) {
+      rooms.add(await join('Guest $seat'));
+    }
+    await expectLater(join('Extra guest'), throwsA(isA<LanRoomException>()));
+    for (final room in rooms.take(4)) {
+      room.send('ready', {'ready': true});
+    }
+    await _waitForMarriage(
+      host,
+      () => _marriagePlayers(host).where((p) => p['ready'] == true).length == 4,
+    );
+    host.send('start');
+    await _waitForMarriage(host, () => host.notice != null);
+    expect(host.view['phase'], 'lobby');
+    rooms.last.send('ready', {'ready': true});
+    await _waitForMarriage(
+      host,
+      () => _marriagePlayers(host).every((p) => p['ready'] == true),
+    );
+
+    Future<void> act(
+      int seat,
+      String action, [
+      Map<String, Object?> fields = const {},
+    ]) async {
+      final before = host.view['revision'];
+      final room = rooms[seat];
+      await _waitForMarriage(room, () => room.view['revision'] == before);
+      room.send(action, fields);
+      await _waitForMarriage(host, () => host.view['revision'] != before);
+      final after = host.view['revision'];
+      for (final room in rooms) {
+        await _waitForMarriage(room, () => room.view['revision'] == after);
+      }
+    }
+
+    await act(0, 'start');
+    expect(host.view['hand'], unorderedEquals(_marriageWinningHand));
+    expect(
+      rooms.expand((room) => (room.view['hand'] as List).cast<int>()).toSet(),
+      hasLength(5 * MarriageGame.handSize),
+    );
+    for (final room in rooms) {
+      expect(room.view['hand'], hasLength(MarriageGame.handSize));
+      expect(room.view['maal'], isNull);
+      expect(
+        _marriagePlayers(room).any(
+          (player) => player.containsKey('hand') || player.containsKey('maal'),
+        ),
+        false,
+      );
+    }
+
+    rooms[1].send('draw', {'fromDiscard': false});
+    await _waitForMarriage(rooms[1], () => rooms[1].notice != null);
+    host.send('lay', {
+      'cards': [0, 0, 1],
+    });
+    await _waitForMarriage(host, () => host.notice != null);
+    expect(_marriagePlayers(host).first['groups'], 0);
+    expect(host.view['log'], isEmpty);
+
+    Future<void> lay(int group) => act(0, 'lay', {
+      'cards': _marriageWinningHand.sublist(
+        group * marriageGroupSize,
+        (group + 1) * marriageGroupSize,
+      ),
+    });
+    for (var group = 0; group < MarriageGame.groupsToReveal; group++) {
+      await lay(group);
+      expect(
+        host.view['maal'] != null,
+        group + 1 == MarriageGame.groupsToReveal,
+      );
+      expect(
+        rooms.skip(1).map((room) => room.view['maal']),
+        everyElement(isNull),
+      );
+    }
+
+    Future<int> drawStock(int seat) async {
+      final hand = (rooms[seat].view['hand'] as List).toSet();
+      final stock = host.view['stockCount'] as int;
+      await act(seat, 'draw', {'fromDiscard': false});
+      expect(host.view['stockCount'], stock - 1);
+      return (rooms[seat].view['hand'] as List).toSet().difference(hand).single
+          as int;
+    }
+
+    final drawn = await drawStock(0);
+    expect((rooms[1].view['log'] as List).last, [
+      1,
+      0,
+      'draw',
+      'Drew a card from stock',
+    ]);
+    expect(
+      rooms
+          .skip(1)
+          .every((room) => !(room.view['hand'] as List).contains(drawn)),
+      true,
+    );
+    host.send('draw', {'fromDiscard': false});
+    await _waitForMarriage(host, () => host.notice != null);
+    await act(0, 'discard', {'card': drawn});
+    expect(host.view['topDiscard'], drawn);
+    expect((rooms[1].view['log'] as List).last, [
+      1,
+      0,
+      'discard',
+      'Discarded ${marriageCardLabel(drawn)}',
+    ]);
+    await act(1, 'draw', {'fromDiscard': true});
+    expect(rooms[1].view['hand'], contains(drawn));
+    expect((host.view['log'] as List).last, [
+      1,
+      1,
+      'draw',
+      'Picked up ${marriageCardLabel(drawn)} from the discard pile',
+    ]);
+    expect(rooms[1].view['discardable'], isNot(contains(drawn)));
+    rooms[1].send('discard', {'card': drawn});
+    await _waitForMarriage(rooms[1], () => rooms[1].notice != null);
+    await act(1, 'discard', {
+      'card': (rooms[1].view['discardable'] as List).first as int,
+    });
+    for (var seat = 2; seat < rooms.length; seat++) {
+      final card = await drawStock(seat);
+      await act(seat, 'discard', {'card': card});
+    }
+
+    for (
+      var group = MarriageGame.groupsToReveal;
+      group < MarriageGame.groupsToWin;
+      group++
+    ) {
+      await lay(group);
+    }
+    for (final room in rooms) {
+      expect(room.view['phase'], 'roundEnd');
+      expect(room.view['winner'], 0);
+      expect(room.view['log'], host.view['log']);
+      expect(_marriagePlayers(room).map((p) => p['roundPoints']), [
+        40,
+        -10,
+        -10,
+        -10,
+        -10,
+      ]);
+    }
+    rooms.last.send('next');
+    await _waitForMarriage(rooms.last, () => rooms.last.notice != null);
+    await act(0, 'next');
+    expect(host.view['round'], 2);
+    expect(rooms.map((room) => room.view['maal']), everyElement(isNull));
+  });
+}
+
+final _marriageWinningHand = [
+  ...List.generate(12, (index) => index),
+  ...List.generate(9, (index) => index + 13),
+];
+
+List<Map<String, dynamic>> _marriagePlayers(LanRoom<MarriageGame> room) =>
+    (room.view['players'] as List).cast<Map<String, dynamic>>();
+
+Future<void> _waitForMarriage(
+  LanRoom<MarriageGame> room,
+  bool Function() condition,
+) {
+  if (condition()) return Future.value();
+  final done = Completer<void>();
+  void listener() {
+    if (!done.isCompleted && condition()) done.complete();
+  }
+
+  room.addListener(listener);
+  return done.future
+      .timeout(const Duration(seconds: 3))
+      .whenComplete(() => room.removeListener(listener));
 }
 
 // List.shuffle swaps from its last index toward its first. Supply the swaps
@@ -132,13 +333,13 @@ void main() {
 class _DealHand implements Random {
   _DealHand(List<int> hand)
     : _target = [
-        for (var card = 0; card < 159; card++)
+        for (var card = 0; card < marriageDeckSize; card++)
           if (!hand.contains(card)) card,
         ...hand,
       ];
 
   final List<int> _target;
-  final _current = List.generate(159, (card) => card);
+  final _current = List.generate(marriageDeckSize, (card) => card);
   final _random = Random(7);
   bool _fixture = true;
 
