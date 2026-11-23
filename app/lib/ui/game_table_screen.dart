@@ -8,6 +8,7 @@ class GameTableScreen extends StatefulWidget {
     required this.title,
     required this.view,
     required this.table,
+    this.actions,
     this.roundLabel = 'Hand',
     super.key,
   });
@@ -15,6 +16,7 @@ class GameTableScreen extends StatefulWidget {
   final String title;
   final Map<String, dynamic> view;
   final Widget table;
+  final Widget? actions;
   final String roundLabel;
 
   @override
@@ -85,7 +87,13 @@ class _GameTableScreenState extends State<GameTableScreen> {
         child: IndexedStack(
           index: _showLog ? 1 : 0,
           children: [
-            widget.table,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: widget.table),
+                ?widget.actions,
+              ],
+            ),
             if (_showLog)
               _GameLog(
                 entries: TableLog.readView(widget.view['log']),

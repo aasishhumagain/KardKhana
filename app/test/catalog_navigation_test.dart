@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kardkhana/cards/playing_card.dart';
 import 'package:kardkhana/kardkhana_app.dart';
+import 'package:kardkhana/ui/table_actions.dart';
+import 'package:kardkhana/ui/table_widgets.dart';
 import 'package:material_ui/material_ui.dart';
 
 void main() {
@@ -95,7 +97,7 @@ void main() {
         expect(find.text('CPU 4'), findsOneWidget);
         expect(find.text('CPU 5'), findsNothing);
         if (game.key == 'Teen Patti') {
-          await tester.tap(find.widgetWithText(OutlinedButton, 'Look'));
+          await tester.tap(find.text('Look').hitTestable());
           await tester.pumpAndSettle();
           expect(find.textContaining('Your hand ·'), findsOneWidget);
         } else {
@@ -157,15 +159,36 @@ void main() {
     expect(find.text('Marriage · Offline'), findsOneWidget);
 
     await tap(find.textContaining('Draw stock'));
-    await tap(find.byType(PlayingCard).hitTestable().first);
-    await tap(find.text('Discard selected'));
-    await tap(log);
+    expect(find.textContaining('Draw stock').hitTestable(), findsNothing);
+    final actions = find.byType(TableActionBar).hitTestable();
+    final actionsTop = tester.getTopLeft(actions).dy;
+    final card = find.byType(PlayingCard).hitTestable().first;
+    final face = find.descendant(of: card, matching: find.byType(InkWell));
+    final cardTop = tester.getTopLeft(face).dy;
+    expect(
+      tester.getSize(card).height,
+      greaterThan(tester.getSize(card).width),
+    );
+    await tap(card);
+    expect(tester.widget<PlayingCard>(card).selected, isTrue);
+    expect(tester.getTopLeft(face).dy, lessThan(cardTop));
+    final tray = find.byType(CardTray).hitTestable();
+    final trayTop = tester.getTopLeft(tray).dy;
+    await tester.drag(tray, const Offset(0, -64));
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(tray).dy, lessThan(trayTop));
+    expect(tester.getTopLeft(actions).dy, actionsTop);
+    await tester.tap(find.text('Discard selected').hitTestable());
+    await tester.pump();
+    await tester.tap(log);
+    await tester.pump();
     final draw = find.text('Drew a card from stock').hitTestable();
     final discard = find.textContaining('Discarded ').hitTestable();
     expect(draw, findsOneWidget);
     expect(discard, findsOneWidget);
     expect(tester.getTopLeft(discard).dy, lessThan(tester.getTopLeft(draw).dy));
 
+    expect(find.text('CPU 1').hitTestable(), findsNothing);
     await tester.pump(const Duration(milliseconds: 1500));
     await tester.pumpAndSettle();
     expect(find.text('CPU 1').hitTestable(), findsWidgets);

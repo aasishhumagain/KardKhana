@@ -8,6 +8,7 @@ import '../lan/lan_room_setup_page.dart';
 import '../offline/offline_table_widgets.dart';
 import '../offline/offline_turn_pacing.dart';
 import '../ui/game_table_screen.dart';
+import '../ui/table_actions.dart';
 import '../ui/table_widgets.dart';
 import 'teen_patti_game.dart';
 import 'teen_patti_room.dart';
@@ -123,6 +124,9 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
     return GameTableScreen(
       title: room == null ? 'Teen Patti · Offline' : 'Teen Patti',
       view: view,
+      actions: phase == 'playing' && (room?.connected ?? true)
+          ? _turnActions(view)
+          : null,
       table: ListView(
         padding: tablePadding,
         children: [
@@ -145,6 +149,46 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
     );
   }
 
+  Widget? _turnActions(Map<String, dynamic> view) {
+    final available = view['actions'] as List;
+    if (available.isEmpty) return null;
+
+    return TableActionBar(
+      actions: [
+        for (final action in const [
+          TeenPattiAction.look,
+          TeenPattiAction.call,
+          TeenPattiAction.raise,
+          TeenPattiAction.show,
+          TeenPattiAction.pack,
+        ])
+          if (available.contains(action.name))
+            TableAction(
+              onPressed: () => _act(action),
+              label: switch (action) {
+                TeenPattiAction.look => 'Look',
+                TeenPattiAction.call => 'Chaal · ${view['callCost']}',
+                TeenPattiAction.raise => 'Raise · ${view['raiseCost']}',
+                TeenPattiAction.show => 'Show · ${view['callCost']}',
+                TeenPattiAction.pack => 'Pack',
+              },
+              icon: switch (action) {
+                TeenPattiAction.look => Icons.visibility_outlined,
+                TeenPattiAction.call => Icons.play_arrow_rounded,
+                TeenPattiAction.raise => Icons.trending_up_rounded,
+                TeenPattiAction.show => Icons.style_outlined,
+                TeenPattiAction.pack => Icons.exit_to_app_rounded,
+              },
+              tone: switch (action) {
+                TeenPattiAction.call => TableActionTone.primary,
+                TeenPattiAction.pack => TableActionTone.caution,
+                _ => TableActionTone.secondary,
+              },
+            ),
+      ],
+    );
+  }
+
   List<Widget> _match(Map<String, dynamic> view, bool complete) {
     final players = (view['players'] as List).cast<Map<String, dynamic>>();
     final seat = view['seat'] as int;
@@ -154,7 +198,6 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
         i == seat ? 'You' : players[i]['name'] as String,
     ];
     final ownHand = (view['hand'] as List).cast<int>();
-    final available = (view['actions'] as List).cast<String>();
     final winners = (view['winners'] as List).cast<int>();
     final pot = view['pot'] as int;
     final reset =
@@ -196,33 +239,20 @@ class _TeenPattiPageState extends State<TeenPattiPage> {
           runSpacing: 6,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            _CardBack(),
-            _CardBack(),
-            _CardBack(),
+            CardTray(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                spacing: 6,
+                children: [
+                  PlayingCard.faceDown(),
+                  PlayingCard.faceDown(),
+                  PlayingCard.faceDown(),
+                ],
+              ),
+            ),
             Text('Your cards are face down. Look to play seen.'),
           ],
         ),
-      if (available.isNotEmpty) ...[
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 4,
-          children: [
-            for (final action in TeenPattiAction.values)
-              if (available.contains(action.name))
-                OutlinedButton(
-                  onPressed: () => _act(action),
-                  child: Text(switch (action) {
-                    TeenPattiAction.look => 'Look',
-                    TeenPattiAction.call => 'Chaal · ${view['callCost']}',
-                    TeenPattiAction.raise => 'Raise · ${view['raiseCost']}',
-                    TeenPattiAction.pack => 'Pack',
-                    TeenPattiAction.show => 'Show · ${view['callCost']}',
-                  }),
-                ),
-          ],
-        ),
-      ],
       if (complete) ...[
         for (var i = 0; i < players.length; i++)
           if (i != seat && (players[i]['reveal'] as List).isNotEmpty)
@@ -247,31 +277,16 @@ Widget _handRow(String title, List<int> hand) => Padding(
     runSpacing: 4,
     crossAxisAlignment: WrapCrossAlignment.center,
     children: [
+      CardTray(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          spacing: 6,
+          children: [
+            for (final card in hand) PlayingCard(card, portrait: true),
+          ],
+        ),
+      ),
       Text('$title · ${rankTeenPattiHand(hand).kind.label}'),
-      for (final card in hand) PlayingCard(card, portrait: true),
     ],
   ),
 );
-
-class _CardBack extends StatelessWidget {
-  const _CardBack();
-
-  @override
-  Widget build(BuildContext context) => ExcludeSemantics(
-    child: Container(
-      width: 30,
-      height: 40,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: const Color(0xFF421952),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFF9670A7)),
-      ),
-      child: const Icon(
-        Icons.diamond_outlined,
-        size: 14,
-        color: Color(0xFFF0C77D),
-      ),
-    ),
-  );
-}

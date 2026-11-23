@@ -9,6 +9,7 @@ import '../lan/lan_room_setup_page.dart';
 import '../offline/offline_table_widgets.dart';
 import '../offline/offline_turn_pacing.dart';
 import '../ui/game_table_screen.dart';
+import '../ui/table_actions.dart';
 import '../ui/table_widgets.dart';
 import 'marriage_game.dart';
 import 'marriage_room.dart';
@@ -147,6 +148,9 @@ class _MarriagePageState extends State<MarriagePage> {
     return GameTableScreen(
       title: room == null ? 'Marriage · Offline' : 'Marriage',
       view: view,
+      actions: phase == 'playing' && (room?.connected ?? true)
+          ? _turnActions(view)
+          : null,
       table: ListView(
         padding: tablePadding,
         children: [
@@ -169,6 +173,58 @@ class _MarriagePageState extends State<MarriagePage> {
     );
   }
 
+  Widget _turnActions(Map<String, dynamic> view) {
+    final yourTurn = view['turn'] == view['seat'];
+    final afterDraw = yourTurn && view['hasDrawn'] == true;
+    final stock = view['stockCount'] as int;
+    final discard = view['topDiscard'] as int?;
+    final maal = view['maal'] as int?;
+    final picked = _selected.length == 1 ? _selected.single : null;
+    final discardable = view['discardable'] as List;
+
+    return TableActionBar(
+      actions: [
+        if (afterDraw)
+          TableAction(
+            label: 'Discard selected',
+            icon: Icons.upload_rounded,
+            tone: TableActionTone.primary,
+            onPressed: picked != null && discardable.contains(picked)
+                ? () => _submit('discard', {
+                    'card': picked,
+                  }, () => _game.discard(0, picked))
+                : null,
+          )
+        else ...[
+          TableAction(
+            label: 'Draw stock · $stock',
+            icon: Icons.layers_outlined,
+            tone: TableActionTone.primary,
+            onPressed: yourTurn && stock > 0
+                ? () => _draw(fromDiscard: false)
+                : null,
+          ),
+          TableAction(
+            label: discard == null
+                ? 'Discard pile empty'
+                : 'Take ${marriageCardLabel(discard)}',
+            icon: Icons.download_rounded,
+            onPressed: yourTurn && discard != null
+                ? () => _draw(fromDiscard: true)
+                : null,
+          ),
+        ],
+        TableAction(
+          label: 'Lay group',
+          icon: Icons.grid_view_rounded,
+          onPressed: yourTurn && _selected.length == marriageGroupSize
+              ? () => _layGroup(maal)
+              : null,
+        ),
+      ],
+    );
+  }
+
   List<Widget> _match(
     BuildContext context,
     Map<String, dynamic> view, {
@@ -184,13 +240,9 @@ class _MarriagePageState extends State<MarriagePage> {
     ];
     final yourTurn = !complete && turn == seat;
     final hasDrawn = view['hasDrawn'] as bool;
-    final stock = view['stockCount'] as int;
     final maal = view['maal'] as int?;
-    final discard = view['topDiscard'] as int?;
     final winner = view['winner'] as int?;
     final hand = (view['hand'] as List).cast<int>();
-    final discardable = (view['discardable'] as List).cast<int>();
-    final picked = _selected.length == 1 ? _selected.single : null;
     final status = complete
         ? winner == null
               ? 'Stock exhausted · Draw'
@@ -211,6 +263,35 @@ class _MarriagePageState extends State<MarriagePage> {
         complete: complete,
       ),
       const SizedBox(height: 8),
+      if (!complete) ...[
+        if (_message case final message?) ...[
+          Text(message, style: TextStyle(color: theme.colorScheme.error)),
+          const SizedBox(height: 4),
+        ],
+        CardTray(
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 8,
+            children: [
+              for (final card in hand)
+                PlayingCard(
+                  isPrintedJoker(card) ? null : marriageFace(card),
+                  key: ValueKey(card),
+                  wild: maal != null && isMarriageWild(card, maal),
+                  selected: _selected.contains(card),
+                  onPressed: yourTurn ? () => _toggleCard(card) : null,
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          maal == null
+              ? 'Lay three pure runs or tunnellas to reveal the maal.'
+              : 'Maal · ${cardLabel(maal)}   Wild cards may complete runs and trials.',
+        ),
+        const SizedBox(height: 8),
+      ],
       TableSeats(
         activeSeat: complete ? null : turn,
         names: names,
@@ -222,75 +303,14 @@ class _MarriagePageState extends State<MarriagePage> {
         ],
       ),
       const SizedBox(height: 8),
-      if (complete) ...[
-        if (widget.room?.isHost ?? true)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton(
-              onPressed: () =>
-                  _submit('next', const {}, () => _game.nextRound()),
-              child: const Text('Next hand'),
-            ),
+      if (complete && (widget.room?.isHost ?? true))
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FilledButton(
+            onPressed: () => _submit('next', const {}, () => _game.nextRound()),
+            child: const Text('Next hand'),
           ),
-      ] else ...[
-        Text(
-          maal == null
-              ? 'Lay three pure runs or tunnellas to reveal the maal.'
-              : 'Maal · ${cardLabel(maal)}   Wild cards may complete runs and trials.',
         ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 4,
-          children: [
-            OutlinedButton(
-              onPressed: yourTurn && !hasDrawn && stock > 0
-                  ? () => _draw(fromDiscard: false)
-                  : null,
-              child: Text('Draw stock · $stock'),
-            ),
-            OutlinedButton(
-              onPressed: yourTurn && !hasDrawn && discard != null
-                  ? () => _draw(fromDiscard: true)
-                  : null,
-              child: Text(
-                discard == null
-                    ? 'Discard pile empty'
-                    : 'Take ${marriageCardLabel(discard)}',
-              ),
-            ),
-            OutlinedButton(
-              onPressed: yourTurn && _selected.length == marriageGroupSize
-                  ? () => _layGroup(maal)
-                  : null,
-              child: const Text('Lay group'),
-            ),
-            OutlinedButton(
-              onPressed: picked != null && discardable.contains(picked)
-                  ? () => _submit('discard', {
-                      'card': picked,
-                    }, () => _game.discard(0, picked))
-                  : null,
-              child: const Text('Discard selected'),
-            ),
-          ],
-        ),
-        if (_message case final message?)
-          Text(message, style: TextStyle(color: theme.colorScheme.error)),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 6,
-          runSpacing: 4,
-          children: [
-            for (final card in hand)
-              PlayingCard(
-                isPrintedJoker(card) ? null : marriageFace(card),
-                wild: maal != null && isMarriageWild(card, maal),
-                selected: _selected.contains(card),
-                onPressed: yourTurn ? () => _toggleCard(card) : null,
-              ),
-          ],
-        ),
-      ],
     ];
   }
 }

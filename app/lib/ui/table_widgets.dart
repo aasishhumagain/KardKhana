@@ -2,6 +2,29 @@ import 'package:material_ui/material_ui.dart';
 
 const tablePadding = EdgeInsets.fromLTRB(16, 10, 16, 14);
 
+class CardTray extends StatelessWidget {
+  const CardTray({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: const Color(0xFF547367)),
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0xFF315A4C), Color(0xFF213F37)],
+      ),
+    ),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+      child: child,
+    ),
+  );
+}
+
 class TableStatus extends StatelessWidget {
   const TableStatus({
     required this.progress,

@@ -64,6 +64,35 @@ void main() {
     expect(game.round, 2);
   });
 
+  test('Teen Patti CPU stays blind when it can only afford the blind call', () {
+    final game = TeenPattiGame(3, random: Random(0));
+    for (final (seat, action) in const [
+      (0, TeenPattiAction.raise),
+      (1, TeenPattiAction.look),
+      (1, TeenPattiAction.raise),
+      (2, TeenPattiAction.call),
+      (0, TeenPattiAction.call),
+      (1, TeenPattiAction.call),
+      (2, TeenPattiAction.pack),
+    ]) {
+      expect(game.act(seat, action), true);
+    }
+    expect(game.winners, [0]);
+    expect(game.nextRound(), true);
+    for (var raise = 0; raise < 3; raise++) {
+      expect(game.act(game.turn, TeenPattiAction.raise), true);
+    }
+
+    expect(game.turn, 1);
+    expect(game.callCost(1), 8);
+    expect(game.pointsFor(1), 10);
+    game.playCpuTurn();
+    expect(game.noteFor(1), 'Chaal 8');
+    expect(game.pointsFor(1), 2);
+    expect(game.visibleHand(1, viewer: 1), isEmpty);
+    expect(game.turn, 2);
+  });
+
   test('Marriage distinguishes pure runs, tunnellas, trials and wildcards', () {
     expect(isMarriageGroup([0, 1, 2]), true);
     expect(isMarriageGroup([12, 0, 1]), true);
@@ -74,6 +103,19 @@ void main() {
     expect(isMarriageGroup([0, 2, 156]), false);
     expect(isMarriageGroup([0, 2, 156], maal: 51), true);
     expect(isMarriageGroup([0, 52, 156], maal: 51), false);
+  });
+
+  test('Marriage counts ace and two as same-suit maal neighbors', () {
+    const aceClubs = 12;
+    const kingClubs = 11;
+    const twoClubs = 0;
+    const twoDiamonds = 13;
+    expect(isMarriageWild(twoClubs, aceClubs), true);
+    expect(isMarriageWild(aceClubs, twoClubs), true);
+    expect(isMarriageWild(kingClubs, aceClubs), true);
+    expect(isMarriageWild(twoDiamonds, aceClubs), false);
+    expect(isMarriageGroup([30, 32, twoClubs], maal: aceClubs), true);
+    expect(isMarriageGroup([kingClubs, aceClubs, twoClubs]), false);
   });
 
   test(

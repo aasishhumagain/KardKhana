@@ -19,10 +19,10 @@ String marriageCardLabel(int card) =>
 bool isMarriageWild(int card, int maal) {
   if (isPrintedJoker(card)) return true;
   final face = marriageFace(card);
-  final rank = cardRank(face);
-  final maalRank = cardRank(maal);
-  return rank == maalRank ||
-      (cardSuit(face) == cardSuit(maal) && (rank - maalRank).abs() == 1);
+  final distance = (cardRank(face) - cardRank(maal)).abs();
+  // Maal neighbors wrap around between ace and two.
+  return distance == 0 ||
+      (cardSuit(face) == cardSuit(maal) && (distance == 1 || distance == 12));
 }
 
 bool isMarriageGroup(List<int> cards, {int? maal}) {

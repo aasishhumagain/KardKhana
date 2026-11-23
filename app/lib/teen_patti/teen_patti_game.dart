@@ -67,6 +67,7 @@ class TeenPattiGame {
   static const startingPoints = 30;
   static const stakeCap = 8;
   static const boot = 1;
+  static const _seenCostMultiplier = 2;
 
   final int playerCount;
   final Random _random;
@@ -158,7 +159,9 @@ class TeenPattiGame {
   void playCpuTurn() {
     final seat = _turn;
     if (seat == 0 || complete) return;
-    if (!_seen[seat] && (_turns >= playerCount || _stake > 1)) {
+    if (!_seen[seat] &&
+        (_turns >= playerCount || _stake > 1) &&
+        _points[seat] >= _stake * _seenCostMultiplier) {
       act(seat, TeenPattiAction.look);
     }
     final actions = actionsFor(seat);
@@ -184,7 +187,8 @@ class TeenPattiGame {
     return true;
   }
 
-  int _cost(int seat, int stake) => _seen[seat] ? 2 * stake : stake;
+  int _cost(int seat, int stake) =>
+      _seen[seat] ? _seenCostMultiplier * stake : stake;
 
   void _pay(int seat, String label) {
     final paid = callCost(seat);

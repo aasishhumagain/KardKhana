@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../cards/playing_card.dart';
 import '../lan/lan_room_setup_page.dart';
 import '../ui/game_table_screen.dart';
+import '../ui/table_actions.dart';
 import '../ui/table_widgets.dart';
 import 'call_break_game.dart';
 import 'call_break_room.dart';
@@ -66,6 +67,21 @@ class _CallBreakTableState extends State<_CallBreakTable> {
           title: room == null ? 'Call Break · Offline' : 'Call Break',
           view: view,
           roundLabel: 'Round',
+          actions:
+              phase == 'bidding' &&
+                  seat == view['turn'] &&
+                  (room?.connected ?? true)
+              ? TableActionBar(
+                  scrollHorizontally: true,
+                  actions: [
+                    for (var bid = 1; bid <= CallBreakGame.cardsPerHand; bid++)
+                      TableAction(
+                        label: '$bid',
+                        onPressed: () => session.send('bid', {'bid': bid}),
+                      ),
+                  ],
+                )
+              : null,
           table: ListView(
             padding: tablePadding,
             children: [
@@ -200,37 +216,24 @@ class _CallBreakTableState extends State<_CallBreakTable> {
               : trickSummary.join('\n'),
         ),
       if (hand.isNotEmpty)
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            spacing: 6,
-            children: [
-              for (final card in hand)
-                PlayingCard(
-                  card,
-                  onPressed: legal.contains(card)
-                      ? () => session.send('play', {'card': card})
-                      : null,
-                ),
-            ],
+        CardTray(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              spacing: 6,
+              children: [
+                for (final card in hand)
+                  PlayingCard(
+                    card,
+                    key: ValueKey(card),
+                    dimmed: playing && seat == turn && !legal.contains(card),
+                    onPressed: legal.contains(card)
+                        ? () => session.send('play', {'card': card})
+                        : null,
+                  ),
+              ],
+            ),
           ),
-        ),
-      if (bidding && seat == turn)
-        Wrap(
-          spacing: 6,
-          runSpacing: 4,
-          children: [
-            for (var bid = 1; bid <= CallBreakGame.cardsPerHand; bid++)
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size(42, 44),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                ),
-                onPressed: () => session.send('bid', {'bid': bid}),
-                child: Text('$bid'),
-              ),
-          ],
         ),
       if (canAdvance && (roundEnd || matchEnd))
         Align(

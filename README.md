@@ -79,7 +79,8 @@ individually. This sequence variant
 uses three decks, three printed jokers, and 21 cards per player. Select three
 cards and tap **Lay group**. Three pure runs or tunnellas unlock the hidden
 maal. The maal's rank, adjacent ranks in its suit, and printed jokers become
-wild for runs and trials once you have seen it. Each turn allows one draw from
+wild for runs and trials once you have seen it. Ace sits between king and two
+when finding the neighboring maal cards. Each turn allows one draw from
 stock or discard, followed by one discard. The first seven declared groups
 win the hand after any required final discard. Each other seat pays 3 points
 if it saw the maal or 10 otherwise. An exhausted stock ends the hand in a draw.
